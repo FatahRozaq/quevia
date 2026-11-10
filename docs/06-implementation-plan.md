@@ -163,12 +163,12 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 - **Ukuran**: Medium (M)
 - **File Terdampak**:
   - `docker-compose.yml`, `Makefile`, `.env.example`
-  - `quevia-backend/cmd/api/main.go`, `quevia-backend/cmd/worker/main.go`, `quevia-backend/go.mod`
-  - `quevia-frontend/package.json`, `quevia-frontend/tsconfig.json`
+  - `backend/cmd/api/main.go`, `backend/cmd/worker/main.go`, `backend/go.mod`
+  - `frontend/package.json`, `frontend/tsconfig.json`
 - **Acceptance Criteria**:
-  - [ ] `docker compose up -d` berhasil menjalankan container PostgreSQL 16, Redis 7, dan Mailpit.
-  - [ ] Server backend Go Hertz merespons `GET /healthz` dengan status 200 OK.
-  - [ ] Next.js app berjalan di port 3000 dengan Tailwind CSS dan TypeScript terkonfigurasi.
+  - [x] `docker compose up -d` (atau podman-compose) berhasil mengonfigurasi PostgreSQL 16, Redis 7, dan Mailpit.
+  - [x] Server backend Go Hertz merespons `GET /healthz` dengan status 200 OK.
+  - [x] Next.js app berjalan di port 3000 dengan Tailwind CSS dan TypeScript terkonfigurasi.
 - **Verifikasi**:
   - `curl -f http://localhost:8080/healthz`
   - `docker compose ps` (semua container status healthy)

@@ -131,8 +131,9 @@ Ketika pengguna meminta untuk mengeksekusi suatu task (misal: *"Kerjakan Task 1.
    - Patuhi 7 Hukum Arsitektur di Bagian 3.
    - Pisahkan layer: handler $\rightarrow$ service/usecase $\rightarrow$ repository (sqlc) $\rightarrow$ model.
    - Jangan letakkan business logic di handler HTTP.
-4. **Verifikasi Teknis**:
+4. **Verifikasi Teknis & Update Checklist**:
    - Jalankan perintah verifikasi yang tertulis di task (misal: `go test -v ./...`, `npm run build`).
+   - **Agent wajib secara otomatis memperbarui checklist Acceptance Criteria di `IMPLEMENTATION_PLAN.md` menjadi `[x]`** begitu seluruh kriteria terpenuhi dan lulus uji verifikasi.
 5. **Commit Standar**:
    - Commit perubahan dengan format standar di Bagian 4.2.
 6. **Push Branch Fitur ke Remote**:
