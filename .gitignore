@@ -3,9 +3,8 @@
 .env.local
 .env.*.local
 !.env.example
-
-# Go build & cache
-/bin/
+bin/
+*/bin/
 *.exe
 *.exe~
 *.dll
