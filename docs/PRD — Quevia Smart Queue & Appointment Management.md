@@ -407,6 +407,13 @@ Pengiriman notifikasi diproses asynchronous oleh background worker (River), memi
 
 Quevia mengadopsi pendekatan **Modular Monolith** dua proses runtime: satu proses API HTTP/WebSocket dan satu proses background Worker.
 - **Frontend**: Next.js (App Router) + TypeScript, Tailwind CSS + shadcn/ui, TanStack Query, React Hook Form + Zod.
+- **Design System & Color Palette**:
+  - **UI Library**: `shadcn/ui` berbasis Radix UI Primitives & Tailwind CSS.
+  - **Palet Warna Utama**:
+    - `#EEEEEE` — Netral Terang (Latar / Border halus / Teks kontras gelap).
+    - `#6FCF97` — Mint Highlight (Aksen sekunder, status aktif / badge sukses, highlight antrean).
+    - `#2FA084` — Brand Primary (Warna aksi utama, tombol interaktif, status serving loket).
+    - `#1F6F5F` — Deep Pine / Forest Teal (Elemen struktural, header, state aktif / penekanan kontras).
 - **Backend API**: Go + Hertz, REST OpenAPI 3.0, WebSocket (`coder/websocket`).
 - **Database**: PostgreSQL (versi stabil terbaru, `btree_gist`, RLS).
 - **Cache & Pub/Sub**: Redis (caching referensi, rate limiting, pub/sub event real-time, token allow-list).

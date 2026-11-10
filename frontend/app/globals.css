@@ -2,13 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+@layer base {
+  :root {
+    --background: 0 0% 93.3%; /* #EEEEEE */
+    --foreground: 168 56% 28%; /* #1F6F5F */
+
+    --card: 0 0% 100%;
+    --card-foreground: 168 56% 28%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 168 56% 28%;
+
+    --primary: 165 55% 41%; /* #2FA084 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 147 50% 62%; /* #6FCF97 */
+    --secondary-foreground: 168 56% 18%;
+
+    --muted: 0 0% 90%;
+    --muted-foreground: 168 30% 35%;
+
+    --accent: 147 50% 62%; /* #6FCF97 */
+    --accent-foreground: 168 56% 18%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 165 55% 41%; /* #2FA084 */
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 168 56% 10%;
+    --foreground: 0 0% 93.3%; /* #EEEEEE */
+
+    --card: 168 56% 14%;
+    --card-foreground: 0 0% 93.3%;
+
+    --popover: 168 56% 14%;
+    --popover-foreground: 0 0% 93.3%;
+
+    --primary: 165 55% 41%; /* #2FA084 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 168 56% 28%; /* #1F6F5F */
+    --secondary-foreground: 0 0% 93.3%;
+
+    --muted: 168 40% 18%;
+    --muted-foreground: 0 0% 75%;
+
+    --accent: 147 50% 62%; /* #6FCF97 */
+    --accent-foreground: 168 56% 15%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 168 40% 20%;
+    --input: 168 40% 20%;
+    --ring: 147 50% 62%; /* #6FCF97 */
+  }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

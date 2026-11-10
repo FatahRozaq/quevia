@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS display_screens CASCADE;

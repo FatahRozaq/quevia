@@ -101,6 +101,10 @@ Closes #[ID_TASK]
 - [ ] Dokumentasi diperbarui (jika ada perubahan API/kontrak)
 ```
 
+5. **Otoritas Merge**:
+   - Seluruh penggabungan (*merge*) ke branch `development` dilakukan secara eksklusif oleh **User / Tech Lead** setelah me-review deskripsi dan hasil pengujian Merge Request.
+   - Coding Agent dilarang keras melakukan auto-merge ke `development` atau `master`.
+
 ---
 
 ## 4. Semantic Versioning & Penandaan Tags

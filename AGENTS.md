@@ -58,16 +58,74 @@ Agent **DILARANG KERAS** melanggar 7 aturan mutlak ini:
 7. **Idempotensi Operasi Kritis**:
    - Endpoint `POST /appointments`, `POST /queue/walk-in`, dan `POST /check-in` wajib memvalidasi header `Idempotency-Key` menggunakan tabel `idempotency_keys` untuk mencegah eksekusi ganda pada network retry.
 
+### 3.1 Skill Wajib Pengembangan Backend & Database (Otomatis & Non-Negotiable)
+
+Ketika mengerjakan backend (`backend/`), migrasi/kueri SQL (`migrations/`, `sql/`), maupun logika data, agent **WAJIB OTOMATIS** menerapkan standar dari 5 skill berikut tanpa perlu diperintahkan secara manual oleh pengguna:
+
+- **Struktur Migrasi & Kueri Modular Wajib**:
+  - File migrasi database (`migrations/`) **WAJIB modular: 1 file migrasi per tabel/ekstensi/fungsi** (`.up.sql` dan `.down.sql`). Dilarang keras menggabungkan banyak tabel dalam satu file migrasi.
+  - File kueri SQL (`sql/queries/`) **WAJIB modular per domain/tabel** (contoh: `users.sql`, `tenants.sql`, `branches.sql`, `appointments.sql`, `queue.sql`).
+
+1. **`sql-optimization`**:
+   - Wajib membuat indeks tertarget (composite, partial unique index `WHERE deleted_at IS NULL`, GiST).
+   - Hindari `SELECT *` pada query aplikasi/sqlc; gunakan proyeksi kolom eksplisit.
+   - Gunakan cursor-based pagination pada list endpoints.
+   - Optimalkan query join dan grouping agar efisien di PostgreSQL.
+2. **`sql-code-review`**:
+   - Parameterized queries mutlak (dilarang keras string concatenation pada SQL).
+   - Verifikasi integritas relasional: `ON DELETE RESTRICT`, CHECK constraint, foreign key indexing.
+   - Konsistensi penamaan DDL: prefix `pk_`, `fk_`, `uq_`, `ix_`, `ck_`, `ex_`.
+   - Deteksi anti-pattern (N+1 query, missing foreign key index, masking DISTINCT).
+3. **`golang-code-style`**:
+   - Struktur kode idiomatic Go 1.22+: early return (guard clauses), minimal nesting.
+   - Fungsi terfokus dengan parameter $\le 4$ (gunakan options struct jika lebih).
+   - Inisialisasi eksplisit: `:=` untuk non-zero, `var` untuk zero value, preallocate slices/maps saat ukuran diketahui.
+   - Grouping deklarasi yang rapi dan unexport aggressively (minimalkan public API surface).
+4. **`golang-security`**:
+   - Validasi ketat di trust boundary (handler DTO validasi).
+   - Pencegahan timing attacks dengan `crypto/subtle.ConstantTimeCompare` pada token/hash.
+   - Hashing kredensial dengan Argon2id.
+   - Sanitasi input dan proteksi data sensitif pada log terstruktur (cegah PII leak).
+5. **`golang-performance`**:
+   - Mindset zero-allocation pada hot-path (perhitungan slot dan pemrosesan antrean).
+   - Konfigurasi connection pooling pgx yang optimal.
+   - Penggunaan `strings.Builder` dan buffer reuse untuk operasi berulang.
+   - Deteksi race condition wajib lolos uji `-race` (`go test -race ./...`).
+
+### 3.2 Skill Wajib Pengembangan Frontend (Otomatis & Non-Negotiable)
+
+Ketika mengerjakan frontend (`frontend/`), komponen UI, layout, interaksi, maupun styling, agent **WAJIB OTOMATIS** menerapkan standar dari 2 skill berikut:
+
+1. **`impeccable`**:
+   - Poles desain frontend tingkat tinggi: tipografi presisi, spasi ritmis, micro-interactions, dan transisi halus.
+   - Kepatuhan estetika modern yang profesional dan responsif pada seluruh ukuran layar.
+2. **`ui-ux-pro-max`**:
+   - Kepatuhan standar aksesibilitas formal **WCAG 2.2 Level AA** (rasio kontras $\ge 4.5:1$, navigasi keyboard penuh, ARIA labels).
+   - Penanganan komprehensif seluruh state antarmuka: empty state, loading skeleton, error recovery, dan banner visual reconnecting saat WebSocket terputus.
+   - Penerapan sistem token warna resmi Quevia (`#EEEEEE`, `#6FCF97`, `#2FA084`, `#1F6F5F`) pada komponen shadcn/ui.
+
+### 3.3 Gaya Komunikasi & Prinsip Kerja Coding
+
+1. **`caveman`**:
+   - Komunikasi singkat, padat, efisien token (*dense, direct, no filler*). Fokus pada fakta, keputusan, dan hasil verifikasi.
+2. **`ponytail`**:
+   - Pola pikir senior developer: solusi paling minimal yang menyelesaikan masalah secara tuntas (*the best code is the least new code*).
+   - Hindari over-engineering, abstraksi prematur, dan kode spekulatif.
+   - Selalu akhiri respon dengan 1–2 baris catatan: apa yang dilewati/tidak diperiksa (*skipped*) dan risiko yang perlu diketahui pengguna (*risk*).
+
 ---
 
 ## 4. Standar Git, Branching, & Commit
 
-### 4.1 Aturan Branching
+### 4.1 Aturan Branching & Merge Request (MR)
 - `master`: Cabang produksi stabil (`protected`). Hanya menerima merge dari `development` dan `hotfix/*`.
 - `development`: Cabang utama integrasi (`protected`). Seluruh task dimulai dengan membuat branch dari sini.
 - `feature/*`: Format `feature/{modul}/{sub_modul}` (contoh: `feature/setup/project_scaffolding`, `feature/appointment/booking`).
-- Selalu gabungkan (*merge*) kembali ke `development` melalui Merge Request (MR).
-
+- **ATURAN MUTLAK MR**:
+  - Seluruh task **WAJIB dikerjakan di branch `feature/*` baru**.
+  - **AGENT DILARANG melakukan auto-merge ke branch `development` atau `master`**.
+  - Agent bertugas meng-commit, me-push branch ke remote (`git push -u origin feature/...`), dan menyajikan template Merge Request (MR).
+  - **Pengguna (User / Lead) yang memiliki hak prerogatif untuk me-review dan me-merge MR ke branch `development`**.
 ### 4.2 Standar Pesan Commit
 Format pesan commit:
 ```text
@@ -128,9 +186,15 @@ Ketika pengguna meminta untuk mengeksekusi suatu task (misal: *"Kerjakan Task 1.
    - Patuhi 7 Hukum Arsitektur di Bagian 3.
    - Pisahkan layer: handler $\rightarrow$ service/usecase $\rightarrow$ repository (sqlc) $\rightarrow$ model.
    - Jangan letakkan business logic di handler HTTP.
-4. **Verifikasi Teknis**:
+4. **Verifikasi Teknis & Update Checklist**:
    - Jalankan perintah verifikasi yang tertulis di task (misal: `go test -v ./...`, `npm run build`).
+   - **Agent wajib secara otomatis memperbarui checklist Acceptance Criteria di `IMPLEMENTATION_PLAN.md` menjadi `[x]`** begitu seluruh kriteria terpenuhi dan lulus uji verifikasi.
 5. **Commit Standar**:
    - Commit perubahan dengan format standar di Bagian 4.2.
-6. **Lapor & Tandai Selesai**:
-   - Laporkan hasil pengujian kepada pengguna beserta ringkasan perubahan.
+6. **Push Branch Fitur ke Remote**:
+   ```bash
+   git push -u origin feature/{modul}/{nama_task}
+   ```
+7. **Sajikan Format Merge Request (MR) & Tunggu Persetujuan**:
+   - Tampilkan laporan hasil pengujian dan format deskripsi Merge Request kepada pengguna.
+   - Pengguna yang akan melakukan merge MR ke branch `development`.

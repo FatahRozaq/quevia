@@ -163,12 +163,12 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 - **Ukuran**: Medium (M)
 - **File Terdampak**:
   - `docker-compose.yml`, `Makefile`, `.env.example`
-  - `quevia-backend/cmd/api/main.go`, `quevia-backend/cmd/worker/main.go`, `quevia-backend/go.mod`
-  - `quevia-frontend/package.json`, `quevia-frontend/tsconfig.json`
+  - `backend/cmd/api/main.go`, `backend/cmd/worker/main.go`, `backend/go.mod`
+  - `frontend/package.json`, `frontend/tsconfig.json`
 - **Acceptance Criteria**:
-  - [ ] `docker compose up -d` berhasil menjalankan container PostgreSQL 16, Redis 7, dan Mailpit.
-  - [ ] Server backend Go Hertz merespons `GET /healthz` dengan status 200 OK.
-  - [ ] Next.js app berjalan di port 3000 dengan Tailwind CSS dan TypeScript terkonfigurasi.
+  - [x] `docker compose up -d` (atau podman-compose) berhasil mengonfigurasi PostgreSQL 16, Redis 7, dan Mailpit.
+  - [x] Server backend Go Hertz merespons `GET /healthz` dengan status 200 OK.
+  - [x] Next.js app berjalan di port 3000 dengan Tailwind CSS dan TypeScript terkonfigurasi.
 - **Verifikasi**:
   - `curl -f http://localhost:8080/healthz`
   - `docker compose ps` (semua container status healthy)
@@ -177,17 +177,16 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 #### Task 1.2: Database Migrations (26 Tabel, Indeks & RLS)
 - **Deskripsi**: Menulis migration SQL lengkap untuk 26 tabel Quevia (ERD v1.1), mengaktifkan ekstensi `btree_gist`, constraint status, foreign key `ON DELETE RESTRICT`, partial unique indexes, dan row-level security policy.
 - **Ukuran**: Large (L)
-- **File Terdampak**:
-  - `quevia-backend/migrations/000001_init_schema.up.sql`
-  - `quevia-backend/migrations/000001_init_schema.down.sql`
-  - `quevia-backend/sqlc.yaml`, `quevia-backend/sql/`
+  - `backend/migrations/000001_init_schema.up.sql`
+  - `backend/migrations/000001_init_schema.down.sql`
+  - `backend/sqlc.yaml`, `backend/sql/`
 - **Acceptance Criteria**:
-  - [ ] Seluruh 26 tabel terbuat tanpa error dependensi foreign key.
-  - [ ] Tabel `appointments` memiliki constraint `ex_appointments_no_overlap` berbasis `btree_gist`.
-  - [ ] Seluruh tabel ber-`tenant_id` memiliki policy `tenant_isolation` dan `FORCE ROW LEVEL SECURITY`.
-  - [ ] Reserved user `guest` (`is_system = true`) terbuat pada script seed.
+  - [x] Seluruh 26 tabel terbuat tanpa error dependensi foreign key.
+  - [x] Tabel `appointments` memiliki constraint `ex_appointments_no_overlap` berbasis `btree_gist`.
+  - [x] Seluruh tabel ber-`tenant_id` memiliki policy `tenant_isolation` dan `FORCE ROW LEVEL SECURITY`.
+  - [x] Reserved user `guest` (`is_system = true`) terbuat pada script seed.
 - **Verifikasi**:
-  - `migrate -path quevia-backend/migrations -database "$DATABASE_URL" up`
+  - `migrate -path backend/migrations -database "$DATABASE_URL" up`
   - `sqlc generate` berjalan tanpa warning/error.
 - **Dependensi**: Task 1.1.
 
