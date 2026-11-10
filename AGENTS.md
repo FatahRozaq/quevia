@@ -62,6 +62,10 @@ Agent **DILARANG KERAS** melanggar 7 aturan mutlak ini:
 
 Ketika mengerjakan backend (`backend/`), migrasi/kueri SQL (`migrations/`, `sql/`), maupun logika data, agent **WAJIB OTOMATIS** menerapkan standar dari 5 skill berikut tanpa perlu diperintahkan secara manual oleh pengguna:
 
+- **Struktur Migrasi & Kueri Modular Wajib**:
+  - File migrasi database (`migrations/`) **WAJIB modular: 1 file migrasi per tabel/ekstensi/fungsi** (`.up.sql` dan `.down.sql`). Dilarang keras menggabungkan banyak tabel dalam satu file migrasi.
+  - File kueri SQL (`sql/queries/`) **WAJIB modular per domain/tabel** (contoh: `users.sql`, `tenants.sql`, `branches.sql`, `appointments.sql`, `queue.sql`).
+
 1. **`sql-optimization`**:
    - Wajib membuat indeks tertarget (composite, partial unique index `WHERE deleted_at IS NULL`, GiST).
    - Hindari `SELECT *` pada query aplikasi/sqlc; gunakan proyeksi kolom eksplisit.
