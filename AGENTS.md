@@ -62,12 +62,15 @@ Agent **DILARANG KERAS** melanggar 7 aturan mutlak ini:
 
 ## 4. Standar Git, Branching, & Commit
 
-### 4.1 Aturan Branching
+### 4.1 Aturan Branching & Merge Request (MR)
 - `master`: Cabang produksi stabil (`protected`). Hanya menerima merge dari `development` dan `hotfix/*`.
 - `development`: Cabang utama integrasi (`protected`). Seluruh task dimulai dengan membuat branch dari sini.
 - `feature/*`: Format `feature/{modul}/{sub_modul}` (contoh: `feature/setup/project_scaffolding`, `feature/appointment/booking`).
-- Selalu gabungkan (*merge*) kembali ke `development` melalui Merge Request (MR).
-
+- **ATURAN MUTLAK MR**:
+  - Seluruh task **WAJIB dikerjakan di branch `feature/*` baru**.
+  - **AGENT DILARANG melakukan auto-merge ke branch `development` atau `master`**.
+  - Agent bertugas meng-commit, me-push branch ke remote (`git push -u origin feature/...`), dan menyajikan template Merge Request (MR).
+  - **Pengguna (User / Lead) yang memiliki hak prerogatif untuk me-review dan me-merge MR ke branch `development`**.
 ### 4.2 Standar Pesan Commit
 Format pesan commit:
 ```text
@@ -132,5 +135,10 @@ Ketika pengguna meminta untuk mengeksekusi suatu task (misal: *"Kerjakan Task 1.
    - Jalankan perintah verifikasi yang tertulis di task (misal: `go test -v ./...`, `npm run build`).
 5. **Commit Standar**:
    - Commit perubahan dengan format standar di Bagian 4.2.
-6. **Lapor & Tandai Selesai**:
-   - Laporkan hasil pengujian kepada pengguna beserta ringkasan perubahan.
+6. **Push Branch Fitur ke Remote**:
+   ```bash
+   git push -u origin feature/{modul}/{nama_task}
+   ```
+7. **Sajikan Format Merge Request (MR) & Tunggu Persetujuan**:
+   - Tampilkan laporan hasil pengujian dan format deskripsi Merge Request kepada pengguna.
+   - Pengguna yang akan melakukan merge MR ke branch `development`.
