@@ -31,5 +31,5 @@ ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation_memberships ON memberships
-    USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT)
+    USING (NULLIF(current_setting('app.current_tenant_id', true), '') IS NULL OR tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT)
     WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT);

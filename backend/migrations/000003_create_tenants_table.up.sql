@@ -26,6 +26,19 @@ CREATE INDEX ix_tenants_deleted_by ON tenants (deleted_by);
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants FORCE ROW LEVEL SECURITY;
 
+CREATE POLICY tenant_insert_tenants ON tenants
+    FOR INSERT
+    WITH CHECK (true);
+
 CREATE POLICY tenant_isolation_tenants ON tenants
+    FOR SELECT
+    USING (id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT);
+
+CREATE POLICY tenant_update_tenants ON tenants
+    FOR UPDATE
     USING (id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT)
     WITH CHECK (id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT);
+
+CREATE POLICY tenant_delete_tenants ON tenants
+    FOR DELETE
+    USING (id = NULLIF(current_setting('app.current_tenant_id', true), '')::BIGINT);

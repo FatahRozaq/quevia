@@ -12,7 +12,7 @@ import (
 
 func TestHealthz(t *testing.T) {
 	h := server.Default()
-	registerRoutes(h)
+	registerRoutes(h, nil, nil)
 
 	w := ut.PerformRequest(h.Engine, http.MethodGet, "/healthz", nil)
 	resp := w.Result()
