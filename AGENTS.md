@@ -58,6 +58,36 @@ Agent **DILARANG KERAS** melanggar 7 aturan mutlak ini:
 7. **Idempotensi Operasi Kritis**:
    - Endpoint `POST /appointments`, `POST /queue/walk-in`, dan `POST /check-in` wajib memvalidasi header `Idempotency-Key` menggunakan tabel `idempotency_keys` untuk mencegah eksekusi ganda pada network retry.
 
+### 3.1 Skill Wajib Pengembangan Backend & Database (Otomatis & Non-Negotiable)
+
+Ketika mengerjakan backend (`backend/`), migrasi/kueri SQL (`migrations/`, `sql/`), maupun logika data, agent **WAJIB OTOMATIS** menerapkan standar dari 5 skill berikut tanpa perlu diperintahkan secara manual oleh pengguna:
+
+1. **`sql-optimization`**:
+   - Wajib membuat indeks tertarget (composite, partial unique index `WHERE deleted_at IS NULL`, GiST).
+   - Hindari `SELECT *` pada query aplikasi/sqlc; gunakan proyeksi kolom eksplisit.
+   - Gunakan cursor-based pagination pada list endpoints.
+   - Optimalkan query join dan grouping agar efisien di PostgreSQL.
+2. **`sql-code-review`**:
+   - Parameterized queries mutlak (dilarang keras string concatenation pada SQL).
+   - Verifikasi integritas relasional: `ON DELETE RESTRICT`, CHECK constraint, foreign key indexing.
+   - Konsistensi penamaan DDL: prefix `pk_`, `fk_`, `uq_`, `ix_`, `ck_`, `ex_`.
+   - Deteksi anti-pattern (N+1 query, missing foreign key index, masking DISTINCT).
+3. **`golang-code-style`**:
+   - Struktur kode idiomatic Go 1.22+: early return (guard clauses), minimal nesting.
+   - Fungsi terfokus dengan parameter $\le 4$ (gunakan options struct jika lebih).
+   - Inisialisasi eksplisit: `:=` untuk non-zero, `var` untuk zero value, preallocate slices/maps saat ukuran diketahui.
+   - Grouping deklarasi yang rapi dan unexport aggressively (minimalkan public API surface).
+4. **`golang-security`**:
+   - Validasi ketat di trust boundary (handler DTO validasi).
+   - Pencegahan timing attacks dengan `crypto/subtle.ConstantTimeCompare` pada token/hash.
+   - Hashing kredensial dengan Argon2id.
+   - Sanitasi input dan proteksi data sensitif pada log terstruktur (cegah PII leak).
+5. **`golang-performance`**:
+   - Mindset zero-allocation pada hot-path (perhitungan slot dan pemrosesan antrean).
+   - Konfigurasi connection pooling pgx yang optimal.
+   - Penggunaan `strings.Builder` dan buffer reuse untuk operasi berulang.
+   - Deteksi race condition wajib lolos uji `-race` (`go test -race ./...`).
+
 ---
 
 ## 4. Standar Git, Branching, & Commit
