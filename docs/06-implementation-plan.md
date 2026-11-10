@@ -194,25 +194,25 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 - **Deskripsi**: Mengimplementasikan registrasi tenant (`POST /api/v1/tenants`), login, penerbitan access token JWT, refresh token di Redis (`rt:<jti>`), serta middleware penentuan tenant yang mengeksekusi `set_config('app.current_tenant_id', ...)` pada database connection pool.
 - **Ukuran**: Medium (M)
 - **File Terdampak**:
-  - `quevia-backend/internal/platform/database/tx.go`
-  - `quevia-backend/internal/platform/middleware/auth.go`
-  - `quevia-backend/internal/platform/middleware/tenant.go`
-  - `quevia-backend/internal/auth/handler.go`, `service.go`, `repository.go`
+  - `backend/internal/platform/database/tx.go`
+  - `backend/internal/platform/middleware/auth.go`
+  - `backend/internal/auth/handler.go`, `service.go`
+  - `backend/internal/platform/security/password.go`, `token/jwt.go`, `cache/redis.go`
 - **Acceptance Criteria**:
-  - [ ] Tenant baru dapat mendaftar beserta cabang pertama dalam satu transaksi atomik.
-  - [ ] Login menghasilkan Access Token di memori dan Refresh Token di httpOnly cookie.
-  - [ ] Request dengan token Tenant A dilarang membaca baris data milik Tenant B di level database (RLS).
+  - [x] Tenant baru dapat mendaftar beserta cabang pertama dalam satu transaksi atomik.
+  - [x] Login menghasilkan Access Token di memori dan Refresh Token di httpOnly cookie.
+  - [x] Request dengan token Tenant A dilarang membaca baris data milik Tenant B di level database (RLS).
 - **Verifikasi**:
-  - `go test -v ./quevia-backend/internal/auth/...`
+  - `go test -v ./backend/internal/auth/...`
   - Integration test isolasi multi-tenant: insert data di Tenant A, query via context Tenant B menghasilkan 0 baris.
 - **Dependensi**: Task 1.2.
 
 ---
 
 #### 🏁 Checkpoint 1 (Akhir Sprint 1)
-- [ ] Database migration up dan down berjalan 100% mulus.
-- [ ] Multi-tenant isolation test lolos (0 kebocoran data antar-tenant).
-- [ ] Autentikasi dan rotasi refresh token di Redis berfungsi normal.
+- [x] Database migration up dan down berjalan 100% mulus.
+- [x] Multi-tenant isolation test lolos (0 kebocoran data antar-tenant).
+- [x] Autentikasi dan rotasi refresh token di Redis berfungsi normal.
 
 ---
 

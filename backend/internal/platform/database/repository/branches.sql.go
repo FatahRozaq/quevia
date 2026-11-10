@@ -11,6 +11,65 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createBranch = `-- name: CreateBranch :one
+INSERT INTO branches (guid, tenant_id, code, name, address, phone, timezone, status, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+RETURNING id, guid, tenant_id, code, name, address, phone, timezone, status, created_at
+`
+
+type CreateBranchParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	TenantID  int64       `db:"tenant_id" json:"tenant_id"`
+	Code      string      `db:"code" json:"code"`
+	Name      string      `db:"name" json:"name"`
+	Address   pgtype.Text `db:"address" json:"address"`
+	Phone     pgtype.Text `db:"phone" json:"phone"`
+	Timezone  string      `db:"timezone" json:"timezone"`
+	Status    string      `db:"status" json:"status"`
+	CreatedBy pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateBranchRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	Code      string             `db:"code" json:"code"`
+	Name      string             `db:"name" json:"name"`
+	Address   pgtype.Text        `db:"address" json:"address"`
+	Phone     pgtype.Text        `db:"phone" json:"phone"`
+	Timezone  string             `db:"timezone" json:"timezone"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateBranch(ctx context.Context, arg CreateBranchParams) (CreateBranchRow, error) {
+	row := q.db.QueryRow(ctx, createBranch,
+		arg.Guid,
+		arg.TenantID,
+		arg.Code,
+		arg.Name,
+		arg.Address,
+		arg.Phone,
+		arg.Timezone,
+		arg.Status,
+		arg.CreatedBy,
+	)
+	var i CreateBranchRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.Code,
+		&i.Name,
+		&i.Address,
+		&i.Phone,
+		&i.Timezone,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getBranchByGUID = `-- name: GetBranchByGUID :one
 SELECT id, guid, tenant_id, code, name, address, phone, timezone, status, created_at, updated_at
 FROM branches
