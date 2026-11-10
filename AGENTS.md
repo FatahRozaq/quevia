@@ -88,6 +88,27 @@ Ketika mengerjakan backend (`backend/`), migrasi/kueri SQL (`migrations/`, `sql/
    - Penggunaan `strings.Builder` dan buffer reuse untuk operasi berulang.
    - Deteksi race condition wajib lolos uji `-race` (`go test -race ./...`).
 
+### 3.2 Skill Wajib Pengembangan Frontend (Otomatis & Non-Negotiable)
+
+Ketika mengerjakan frontend (`frontend/`), komponen UI, layout, interaksi, maupun styling, agent **WAJIB OTOMATIS** menerapkan standar dari 2 skill berikut:
+
+1. **`impeccable`**:
+   - Poles desain frontend tingkat tinggi: tipografi presisi, spasi ritmis, micro-interactions, dan transisi halus.
+   - Kepatuhan estetika modern yang profesional dan responsif pada seluruh ukuran layar.
+2. **`ui-ux-pro-max`**:
+   - Kepatuhan standar aksesibilitas formal **WCAG 2.2 Level AA** (rasio kontras $\ge 4.5:1$, navigasi keyboard penuh, ARIA labels).
+   - Penanganan komprehensif seluruh state antarmuka: empty state, loading skeleton, error recovery, dan banner visual reconnecting saat WebSocket terputus.
+   - Penerapan sistem token warna resmi Quevia (`#EEEEEE`, `#6FCF97`, `#2FA084`, `#1F6F5F`) pada komponen shadcn/ui.
+
+### 3.3 Gaya Komunikasi & Prinsip Kerja Coding
+
+1. **`caveman`**:
+   - Komunikasi singkat, padat, efisien token (*dense, direct, no filler*). Fokus pada fakta, keputusan, dan hasil verifikasi.
+2. **`ponytail`**:
+   - Pola pikir senior developer: solusi paling minimal yang menyelesaikan masalah secara tuntas (*the best code is the least new code*).
+   - Hindari over-engineering, abstraksi prematur, dan kode spekulatif.
+   - Selalu akhiri respon dengan 1–2 baris catatan: apa yang dilewati/tidak diperiksa (*skipped*) dan risiko yang perlu diketahui pengguna (*risk*).
+
 ---
 
 ## 4. Standar Git, Branching, & Commit
