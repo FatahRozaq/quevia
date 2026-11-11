@@ -12,24 +12,45 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
 	"github.com/FatahRozaq/quevia/backend/internal/auth"
+	"github.com/FatahRozaq/quevia/backend/internal/branch"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
+	"github.com/FatahRozaq/quevia/backend/internal/service"
+	"github.com/FatahRozaq/quevia/backend/internal/staff"
 )
+
+type AppHandlers struct {
+	Auth    *auth.Handler
+	Branch  *branch.Handler
+	Service *service.Handler
+	Staff   *staff.Handler
+}
 
 func registerRoutes(
 	h *server.Hertz,
-	authHandler *auth.Handler,
+	handlers *AppHandlers,
 	authMw app.HandlerFunc,
 ) {
 	h.GET("/healthz", func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(consts.StatusOK, utils.H{"status": "ok", "service": "quevia-api"})
 	})
 
-	if authHandler != nil {
+	if handlers != nil {
 		v1 := h.Group("/api/v1")
-		authHandler.RegisterRoutes(v1, authMw)
+		if handlers.Auth != nil {
+			handlers.Auth.RegisterRoutes(v1, authMw)
+		}
+		if handlers.Branch != nil {
+			handlers.Branch.RegisterRoutes(v1, authMw)
+		}
+		if handlers.Service != nil {
+			handlers.Service.RegisterRoutes(v1, authMw)
+		}
+		if handlers.Staff != nil {
+			handlers.Staff.RegisterRoutes(v1, authMw)
+		}
 	}
 }
 
@@ -47,7 +68,7 @@ func main() {
 	tokenManager := token.NewTokenManager(jwtKey, 15*time.Minute)
 	authMw := middleware.AuthMiddleware(tokenManager)
 
-	var authHandler *auth.Handler
+	var handlers *AppHandlers
 	dbURL := os.Getenv("DATABASE_URL")
 	redisURL := os.Getenv("REDIS_URL")
 
@@ -64,11 +85,20 @@ func main() {
 			log.Fatalf("failed to connect to redis: %v", err)
 		}
 
-		authService := auth.NewService(pool, sessionStore, tokenManager, 14*24*time.Hour)
-		authHandler = auth.NewHandler(authService)
+		authSvc := auth.NewService(pool, sessionStore, tokenManager, 14*24*time.Hour)
+		branchSvc := branch.NewService(pool)
+		serviceSvc := service.NewService(pool)
+		staffSvc := staff.NewService(pool)
+
+		handlers = &AppHandlers{
+			Auth:    auth.NewHandler(authSvc),
+			Branch:  branch.NewHandler(branchSvc),
+			Service: service.NewHandler(serviceSvc),
+			Staff:   staff.NewHandler(staffSvc),
+		}
 	}
 
 	h := server.Default(server.WithHostPorts(":" + port))
-	registerRoutes(h, authHandler, authMw)
+	registerRoutes(h, handlers, authMw)
 	h.Spin()
 }

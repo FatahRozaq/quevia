@@ -222,16 +222,16 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 - **Deskripsi**: CRUD untuk branches, branch_settings (termasuk `notify_before_queue_count`), services, staff_profiles, staff_schedules, schedule_exceptions, dan service_counters.
 - **Ukuran**: Medium (M)
 - **File Terdampak**:
-  - `quevia-backend/internal/branch/...`
-  - `quevia-backend/internal/service/...`
-  - `quevia-backend/internal/staff/...`
+  - `backend/internal/branch/...`
+  - `backend/internal/service/...`
+  - `backend/internal/staff/...`
 - **Acceptance Criteria**:
-  - [ ] Admin dapat mengatur jam operasional mingguan cabang dan jam kerja staff.
-  - [ ] Staff dapat diasosiasikan dengan layanan yang didukung via `staff_services`.
-  - [ ] Penonaktifan staff dilarang jika masih memiliki appointment aktif `CONFIRMED` di masa depan (**FR-SVC-06, BR-19**).
+  - [x] Admin dapat mengatur jam operasional mingguan cabang dan jam kerja staff.
+  - [x] Staff dapat diasosiasikan dengan layanan yang didukung via `staff_services`.
+  - [x] Penonaktifan staff dilarang jika masih memiliki appointment aktif `CONFIRMED` di masa depan (**FR-SVC-06, BR-19**).
 - **Verifikasi**:
   - Unit test validasi penonaktifan staff dengan appointment aktif menolak dengan kode 422.
-  - `go test -v ./quevia-backend/internal/staff/...`
+  - `go test -v ./backend/internal/staff/...`
 - **Dependensi**: Task 1.3.
 
 #### Task 2.2: Appointment Engine & Anti-Double Booking (GiST)
