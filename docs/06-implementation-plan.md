@@ -238,17 +238,17 @@ Setiap task di bawah ini mematuhi standar ukuran terarah (*Sizing: XS, S, M, L; 
 - **Deskripsi**: Perhitungan ketersediaan slot (`GET /api/v1/appointments/availability`), pembuatan booking mandiri tamu dengan `Idempotency-Key` (`POST /api/v1/appointments`), pembuatan `booking_code` berformat `QV-XXXXXX` dan `qr_token`, reschedule, serta cancel.
 - **Ukuran**: Large (L)
 - **File Terdampak**:
-  - `quevia-backend/internal/appointment/availability.go`
-  - `quevia-backend/internal/appointment/booking.go`
-  - `quevia-backend/internal/platform/idempotency/idempotency.go`
+  - `backend/internal/appointment/availability.go`
+  - `backend/internal/appointment/booking.go`
+  - `backend/internal/platform/idempotency/idempotency.go`
 - **Acceptance Criteria**:
-  - [ ] Slot ketersediaan hanya menampilkan waktu yang bebas bentrok dengan jam kerja, cuti, istirahat, buffer, dan booking staff lain.
-  - [ ] Booking tamu mewajibkan email valid dan mencatat audit log dengan reserved user `guest`.
-  - [ ] Dua request booking bersamaan pada slot dan staff yang sama menghasilkan tepat 1 sukses dan 1 respon `409 SLOT_UNAVAILABLE` via GiST constraint.
-  - [ ] Pengiriman ulang request dengan `Idempotency-Key` yang sama mengembalikan respons tersimpan tanpa membuat booking ganda.
+  - [x] Slot ketersediaan hanya menampilkan waktu yang bebas bentrok dengan jam kerja, cuti, istirahat, buffer, dan booking staff lain.
+  - [x] Booking tamu mewajibkan email valid dan mencatat audit log dengan reserved user `guest`.
+  - [x] Dua request booking bersamaan pada slot dan staff yang sama menghasilkan tepat 1 sukses dan 1 respon `409 SLOT_UNAVAILABLE` via GiST constraint.
+  - [x] Pengiriman ulang request dengan `Idempotency-Key` yang sama mengembalikan respons tersimpan tanpa membuat booking ganda.
 - **Verifikasi**:
   - **Concurrency Test**: 50 goroutine melakukan booking konkuren pada slot yang sama $\rightarrow$ tepat 1 record tercipta di DB.
-  - `go test -v -race ./quevia-backend/internal/appointment/...`
+  - `go test -v -race ./backend/internal/appointment/...`
 - **Dependensi**: Task 2.1.
 
 #### Task 2.3: Queue Engine (Counters, Walk-in, & Check-in)
