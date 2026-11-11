@@ -11,19 +11,57 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelAppointment = `-- name: CancelAppointment :one
+UPDATE appointments
+SET status = 'CANCELLED', cancelled_at = NOW(), cancel_reason = $2, updated_at = NOW(), updated_by = $3
+WHERE guid = $1 AND status IN ('CONFIRMED', 'CHECKED_IN') AND deleted_at IS NULL
+RETURNING id, guid, booking_code, status, cancelled_at, cancel_reason, updated_at
+`
+
+type CancelAppointmentParams struct {
+	Guid         pgtype.UUID `db:"guid" json:"guid"`
+	CancelReason pgtype.Text `db:"cancel_reason" json:"cancel_reason"`
+	UpdatedBy    pgtype.Int8 `db:"updated_by" json:"updated_by"`
+}
+
+type CancelAppointmentRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Guid         pgtype.UUID        `db:"guid" json:"guid"`
+	BookingCode  string             `db:"booking_code" json:"booking_code"`
+	Status       string             `db:"status" json:"status"`
+	CancelledAt  pgtype.Timestamptz `db:"cancelled_at" json:"cancelled_at"`
+	CancelReason pgtype.Text        `db:"cancel_reason" json:"cancel_reason"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (CancelAppointmentRow, error) {
+	row := q.db.QueryRow(ctx, cancelAppointment, arg.Guid, arg.CancelReason, arg.UpdatedBy)
+	var i CancelAppointmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.BookingCode,
+		&i.Status,
+		&i.CancelledAt,
+		&i.CancelReason,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const checkStaffOverlap = `-- name: CheckStaffOverlap :many
 SELECT id, start_at, end_at, status
 FROM appointments
 WHERE staff_id = $1
   AND deleted_at IS NULL
   AND status IN ('CONFIRMED', 'CHECKED_IN')
-  AND tstzrange(start_at, end_at) && tstzrange($2, $3)
+  AND tstzrange(start_at, end_at) && tstzrange($2::timestamptz, $3::timestamptz)
 `
 
 type CheckStaffOverlapParams struct {
-	StaffID     int64       `db:"staff_id" json:"staff_id"`
-	Tstzrange   interface{} `db:"tstzrange" json:"tstzrange"`
-	Tstzrange_2 interface{} `db:"tstzrange_2" json:"tstzrange_2"`
+	StaffID int64              `db:"staff_id" json:"staff_id"`
+	StartAt pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt   pgtype.Timestamptz `db:"end_at" json:"end_at"`
 }
 
 type CheckStaffOverlapRow struct {
@@ -34,7 +72,7 @@ type CheckStaffOverlapRow struct {
 }
 
 func (q *Queries) CheckStaffOverlap(ctx context.Context, arg CheckStaffOverlapParams) ([]CheckStaffOverlapRow, error) {
-	rows, err := q.db.Query(ctx, checkStaffOverlap, arg.StaffID, arg.Tstzrange, arg.Tstzrange_2)
+	rows, err := q.db.Query(ctx, checkStaffOverlap, arg.StaffID, arg.StartAt, arg.EndAt)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +104,7 @@ INSERT INTO appointments (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9, $10, $11, $12, $13, $13
 )
-RETURNING id, guid, booking_code, qr_token, start_at, end_at, status, created_at
+RETURNING id, guid, tenant_id, branch_id, customer_id, service_id, staff_id, booking_code, qr_token, start_at, end_at, status, created_at
 `
 
 type CreateAppointmentParams struct {
@@ -88,6 +126,11 @@ type CreateAppointmentParams struct {
 type CreateAppointmentRow struct {
 	ID          int64              `db:"id" json:"id"`
 	Guid        pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID    int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID    int64              `db:"branch_id" json:"branch_id"`
+	CustomerID  int64              `db:"customer_id" json:"customer_id"`
+	ServiceID   int64              `db:"service_id" json:"service_id"`
+	StaffID     int64              `db:"staff_id" json:"staff_id"`
 	BookingCode string             `db:"booking_code" json:"booking_code"`
 	QrToken     string             `db:"qr_token" json:"qr_token"`
 	StartAt     pgtype.Timestamptz `db:"start_at" json:"start_at"`
@@ -116,12 +159,94 @@ func (q *Queries) CreateAppointment(ctx context.Context, arg CreateAppointmentPa
 	err := row.Scan(
 		&i.ID,
 		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.CustomerID,
+		&i.ServiceID,
+		&i.StaffID,
 		&i.BookingCode,
 		&i.QrToken,
 		&i.StartAt,
 		&i.EndAt,
 		&i.Status,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getAppointmentByBookingCodeAndEmail = `-- name: GetAppointmentByBookingCodeAndEmail :one
+SELECT a.id, a.guid, a.tenant_id, a.branch_id, a.customer_id, a.service_id, a.staff_id,
+       a.booking_code, a.qr_token, a.start_at, a.end_at, a.status, a.notes, a.rescheduled_count, a.created_at,
+       c.full_name as customer_name, c.email as customer_email,
+       s.name as service_name, s.duration_minutes,
+       sp.guid as staff_guid, sp.display_name as staff_name,
+       b.name as branch_name, b.timezone as branch_timezone
+FROM appointments a
+INNER JOIN customers c ON a.customer_id = c.id AND c.deleted_at IS NULL
+INNER JOIN services s ON a.service_id = s.id AND s.deleted_at IS NULL
+INNER JOIN staff_profiles sp ON a.staff_id = sp.id AND sp.deleted_at IS NULL
+INNER JOIN branches b ON a.branch_id = b.id AND b.deleted_at IS NULL
+WHERE a.booking_code = $1 AND lower(c.email) = lower($2) AND a.deleted_at IS NULL
+`
+
+type GetAppointmentByBookingCodeAndEmailParams struct {
+	BookingCode string `db:"booking_code" json:"booking_code"`
+	Lower       string `db:"lower" json:"lower"`
+}
+
+type GetAppointmentByBookingCodeAndEmailRow struct {
+	ID               int64              `db:"id" json:"id"`
+	Guid             pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID         int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID         int64              `db:"branch_id" json:"branch_id"`
+	CustomerID       int64              `db:"customer_id" json:"customer_id"`
+	ServiceID        int64              `db:"service_id" json:"service_id"`
+	StaffID          int64              `db:"staff_id" json:"staff_id"`
+	BookingCode      string             `db:"booking_code" json:"booking_code"`
+	QrToken          string             `db:"qr_token" json:"qr_token"`
+	StartAt          pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt            pgtype.Timestamptz `db:"end_at" json:"end_at"`
+	Status           string             `db:"status" json:"status"`
+	Notes            pgtype.Text        `db:"notes" json:"notes"`
+	RescheduledCount int16              `db:"rescheduled_count" json:"rescheduled_count"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CustomerName     string             `db:"customer_name" json:"customer_name"`
+	CustomerEmail    pgtype.Text        `db:"customer_email" json:"customer_email"`
+	ServiceName      string             `db:"service_name" json:"service_name"`
+	DurationMinutes  int32              `db:"duration_minutes" json:"duration_minutes"`
+	StaffGuid        pgtype.UUID        `db:"staff_guid" json:"staff_guid"`
+	StaffName        string             `db:"staff_name" json:"staff_name"`
+	BranchName       string             `db:"branch_name" json:"branch_name"`
+	BranchTimezone   string             `db:"branch_timezone" json:"branch_timezone"`
+}
+
+func (q *Queries) GetAppointmentByBookingCodeAndEmail(ctx context.Context, arg GetAppointmentByBookingCodeAndEmailParams) (GetAppointmentByBookingCodeAndEmailRow, error) {
+	row := q.db.QueryRow(ctx, getAppointmentByBookingCodeAndEmail, arg.BookingCode, arg.Lower)
+	var i GetAppointmentByBookingCodeAndEmailRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.CustomerID,
+		&i.ServiceID,
+		&i.StaffID,
+		&i.BookingCode,
+		&i.QrToken,
+		&i.StartAt,
+		&i.EndAt,
+		&i.Status,
+		&i.Notes,
+		&i.RescheduledCount,
+		&i.CreatedAt,
+		&i.CustomerName,
+		&i.CustomerEmail,
+		&i.ServiceName,
+		&i.DurationMinutes,
+		&i.StaffGuid,
+		&i.StaffName,
+		&i.BranchName,
+		&i.BranchTimezone,
 	)
 	return i, err
 }
@@ -170,6 +295,102 @@ func (q *Queries) GetAppointmentByGUID(ctx context.Context, guid pgtype.UUID) (G
 		&i.Notes,
 		&i.RescheduledCount,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listStaffAppointmentsForDateRange = `-- name: ListStaffAppointmentsForDateRange :many
+SELECT id, staff_id, start_at, end_at, status
+FROM appointments
+WHERE staff_id = $1
+  AND status IN ('CONFIRMED', 'CHECKED_IN')
+  AND deleted_at IS NULL
+  AND tstzrange(start_at, end_at) && tstzrange($2::timestamptz, $3::timestamptz)
+ORDER BY start_at ASC
+`
+
+type ListStaffAppointmentsForDateRangeParams struct {
+	StaffID int64              `db:"staff_id" json:"staff_id"`
+	StartAt pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt   pgtype.Timestamptz `db:"end_at" json:"end_at"`
+}
+
+type ListStaffAppointmentsForDateRangeRow struct {
+	ID      int64              `db:"id" json:"id"`
+	StaffID int64              `db:"staff_id" json:"staff_id"`
+	StartAt pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt   pgtype.Timestamptz `db:"end_at" json:"end_at"`
+	Status  string             `db:"status" json:"status"`
+}
+
+func (q *Queries) ListStaffAppointmentsForDateRange(ctx context.Context, arg ListStaffAppointmentsForDateRangeParams) ([]ListStaffAppointmentsForDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, listStaffAppointmentsForDateRange, arg.StaffID, arg.StartAt, arg.EndAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffAppointmentsForDateRangeRow{}
+	for rows.Next() {
+		var i ListStaffAppointmentsForDateRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const rescheduleAppointment = `-- name: RescheduleAppointment :one
+UPDATE appointments
+SET start_at = $2, end_at = $3, rescheduled_count = rescheduled_count + 1, updated_at = NOW(), updated_by = $4
+WHERE guid = $1 AND deleted_at IS NULL
+RETURNING id, guid, booking_code, start_at, end_at, status, rescheduled_count, updated_at
+`
+
+type RescheduleAppointmentParams struct {
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	StartAt   pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt     pgtype.Timestamptz `db:"end_at" json:"end_at"`
+	UpdatedBy pgtype.Int8        `db:"updated_by" json:"updated_by"`
+}
+
+type RescheduleAppointmentRow struct {
+	ID               int64              `db:"id" json:"id"`
+	Guid             pgtype.UUID        `db:"guid" json:"guid"`
+	BookingCode      string             `db:"booking_code" json:"booking_code"`
+	StartAt          pgtype.Timestamptz `db:"start_at" json:"start_at"`
+	EndAt            pgtype.Timestamptz `db:"end_at" json:"end_at"`
+	Status           string             `db:"status" json:"status"`
+	RescheduledCount int16              `db:"rescheduled_count" json:"rescheduled_count"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) RescheduleAppointment(ctx context.Context, arg RescheduleAppointmentParams) (RescheduleAppointmentRow, error) {
+	row := q.db.QueryRow(ctx, rescheduleAppointment,
+		arg.Guid,
+		arg.StartAt,
+		arg.EndAt,
+		arg.UpdatedBy,
+	)
+	var i RescheduleAppointmentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.BookingCode,
+		&i.StartAt,
+		&i.EndAt,
+		&i.Status,
+		&i.RescheduledCount,
 		&i.UpdatedAt,
 	)
 	return i, err

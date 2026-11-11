@@ -71,6 +71,13 @@ FROM staff_schedules
 WHERE staff_id = $1 AND deleted_at IS NULL
 ORDER BY day_of_week ASC, start_time ASC;
 
+-- name: GetStaffScheduleForDay :one
+SELECT id, guid, tenant_id, staff_id, day_of_week, start_time, end_time,
+       break_start, break_end, valid_from, valid_until, created_at
+FROM staff_schedules
+WHERE staff_id = $1 AND day_of_week = $2 AND deleted_at IS NULL
+LIMIT 1;
+
 -- name: DeleteStaffSchedulesByStaffID :exec
 UPDATE staff_schedules
 SET deleted_at = NOW(), deleted_by = $2
@@ -93,3 +100,12 @@ SELECT id, guid, tenant_id, branch_id, staff_id, exception_type,
 FROM schedule_exceptions
 WHERE branch_id = $1 AND deleted_at IS NULL
 ORDER BY start_date ASC;
+
+-- name: GetScheduleExceptionsForStaffAndDate :many
+SELECT id, guid, tenant_id, branch_id, staff_id, exception_type,
+       start_date, end_date, start_time, end_time, reason, created_at
+FROM schedule_exceptions
+WHERE branch_id = $1
+  AND (staff_id IS NULL OR staff_id = $2)
+  AND $3 BETWEEN start_date AND end_date
+  AND deleted_at IS NULL;

@@ -292,6 +292,70 @@ func (q *Queries) DeleteStaffSchedulesByStaffID(ctx context.Context, arg DeleteS
 	return err
 }
 
+const getScheduleExceptionsForStaffAndDate = `-- name: GetScheduleExceptionsForStaffAndDate :many
+SELECT id, guid, tenant_id, branch_id, staff_id, exception_type,
+       start_date, end_date, start_time, end_time, reason, created_at
+FROM schedule_exceptions
+WHERE branch_id = $1
+  AND (staff_id IS NULL OR staff_id = $2)
+  AND $3 BETWEEN start_date AND end_date
+  AND deleted_at IS NULL
+`
+
+type GetScheduleExceptionsForStaffAndDateParams struct {
+	BranchID  int64       `db:"branch_id" json:"branch_id"`
+	StaffID   pgtype.Int8 `db:"staff_id" json:"staff_id"`
+	StartDate pgtype.Date `db:"start_date" json:"start_date"`
+}
+
+type GetScheduleExceptionsForStaffAndDateRow struct {
+	ID            int64              `db:"id" json:"id"`
+	Guid          pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID      int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID      int64              `db:"branch_id" json:"branch_id"`
+	StaffID       pgtype.Int8        `db:"staff_id" json:"staff_id"`
+	ExceptionType string             `db:"exception_type" json:"exception_type"`
+	StartDate     pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate       pgtype.Date        `db:"end_date" json:"end_date"`
+	StartTime     pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime       pgtype.Time        `db:"end_time" json:"end_time"`
+	Reason        pgtype.Text        `db:"reason" json:"reason"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetScheduleExceptionsForStaffAndDate(ctx context.Context, arg GetScheduleExceptionsForStaffAndDateParams) ([]GetScheduleExceptionsForStaffAndDateRow, error) {
+	rows, err := q.db.Query(ctx, getScheduleExceptionsForStaffAndDate, arg.BranchID, arg.StaffID, arg.StartDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetScheduleExceptionsForStaffAndDateRow{}
+	for rows.Next() {
+		var i GetScheduleExceptionsForStaffAndDateRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.BranchID,
+			&i.StaffID,
+			&i.ExceptionType,
+			&i.StartDate,
+			&i.EndDate,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Reason,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStaffProfileByGUID = `-- name: GetStaffProfileByGUID :one
 SELECT id, guid, tenant_id, branch_id, user_id, display_name, specialization, status, created_at, updated_at
 FROM staff_profiles
@@ -325,6 +389,54 @@ func (q *Queries) GetStaffProfileByGUID(ctx context.Context, guid pgtype.UUID) (
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStaffScheduleForDay = `-- name: GetStaffScheduleForDay :one
+SELECT id, guid, tenant_id, staff_id, day_of_week, start_time, end_time,
+       break_start, break_end, valid_from, valid_until, created_at
+FROM staff_schedules
+WHERE staff_id = $1 AND day_of_week = $2 AND deleted_at IS NULL
+LIMIT 1
+`
+
+type GetStaffScheduleForDayParams struct {
+	StaffID   int64 `db:"staff_id" json:"staff_id"`
+	DayOfWeek int16 `db:"day_of_week" json:"day_of_week"`
+}
+
+type GetStaffScheduleForDayRow struct {
+	ID         int64              `db:"id" json:"id"`
+	Guid       pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID   int64              `db:"tenant_id" json:"tenant_id"`
+	StaffID    int64              `db:"staff_id" json:"staff_id"`
+	DayOfWeek  int16              `db:"day_of_week" json:"day_of_week"`
+	StartTime  pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime    pgtype.Time        `db:"end_time" json:"end_time"`
+	BreakStart pgtype.Time        `db:"break_start" json:"break_start"`
+	BreakEnd   pgtype.Time        `db:"break_end" json:"break_end"`
+	ValidFrom  pgtype.Date        `db:"valid_from" json:"valid_from"`
+	ValidUntil pgtype.Date        `db:"valid_until" json:"valid_until"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetStaffScheduleForDay(ctx context.Context, arg GetStaffScheduleForDayParams) (GetStaffScheduleForDayRow, error) {
+	row := q.db.QueryRow(ctx, getStaffScheduleForDay, arg.StaffID, arg.DayOfWeek)
+	var i GetStaffScheduleForDayRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.StaffID,
+		&i.DayOfWeek,
+		&i.StartTime,
+		&i.EndTime,
+		&i.BreakStart,
+		&i.BreakEnd,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.CreatedAt,
 	)
 	return i, err
 }

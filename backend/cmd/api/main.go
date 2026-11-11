@@ -11,10 +11,12 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
+	"github.com/FatahRozaq/quevia/backend/internal/appointment"
 	"github.com/FatahRozaq/quevia/backend/internal/auth"
 	"github.com/FatahRozaq/quevia/backend/internal/branch"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
+	"github.com/FatahRozaq/quevia/backend/internal/platform/idempotency"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
 	"github.com/FatahRozaq/quevia/backend/internal/service"
@@ -22,10 +24,11 @@ import (
 )
 
 type AppHandlers struct {
-	Auth    *auth.Handler
-	Branch  *branch.Handler
-	Service *service.Handler
-	Staff   *staff.Handler
+	Auth        *auth.Handler
+	Branch      *branch.Handler
+	Service     *service.Handler
+	Staff       *staff.Handler
+	Appointment *appointment.Handler
 }
 
 func registerRoutes(
@@ -50,6 +53,9 @@ func registerRoutes(
 		}
 		if handlers.Staff != nil {
 			handlers.Staff.RegisterRoutes(v1, authMw)
+		}
+		if handlers.Appointment != nil {
+			handlers.Appointment.RegisterRoutes(v1, authMw)
 		}
 	}
 }
@@ -85,16 +91,20 @@ func main() {
 			log.Fatalf("failed to connect to redis: %v", err)
 		}
 
+		idempotencyMgr := idempotency.NewManager(pool, 24*time.Hour)
+
 		authSvc := auth.NewService(pool, sessionStore, tokenManager, 14*24*time.Hour)
 		branchSvc := branch.NewService(pool)
 		serviceSvc := service.NewService(pool)
 		staffSvc := staff.NewService(pool)
+		aptSvc := appointment.NewService(pool)
 
 		handlers = &AppHandlers{
-			Auth:    auth.NewHandler(authSvc),
-			Branch:  branch.NewHandler(branchSvc),
-			Service: service.NewHandler(serviceSvc),
-			Staff:   staff.NewHandler(staffSvc),
+			Auth:        auth.NewHandler(authSvc),
+			Branch:      branch.NewHandler(branchSvc),
+			Service:     service.NewHandler(serviceSvc),
+			Staff:       staff.NewHandler(staffSvc),
+			Appointment: appointment.NewHandler(aptSvc, idempotencyMgr),
 		}
 	}
 
