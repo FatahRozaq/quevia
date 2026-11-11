@@ -11,6 +11,148 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createService = `-- name: CreateService :one
+INSERT INTO services (
+    guid, tenant_id, branch_id, category_id, name, description,
+    duration_minutes, buffer_minutes, price, queue_prefix, required_specialization, status,
+    created_by, updated_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11, $12,
+    $13, $13
+)
+RETURNING id, guid, tenant_id, branch_id, category_id, name, description,
+          duration_minutes, buffer_minutes, price, queue_prefix, required_specialization, status, created_at
+`
+
+type CreateServiceParams struct {
+	Guid                   pgtype.UUID    `db:"guid" json:"guid"`
+	TenantID               int64          `db:"tenant_id" json:"tenant_id"`
+	BranchID               int64          `db:"branch_id" json:"branch_id"`
+	CategoryID             pgtype.Int8    `db:"category_id" json:"category_id"`
+	Name                   string         `db:"name" json:"name"`
+	Description            pgtype.Text    `db:"description" json:"description"`
+	DurationMinutes        int32          `db:"duration_minutes" json:"duration_minutes"`
+	BufferMinutes          int32          `db:"buffer_minutes" json:"buffer_minutes"`
+	Price                  pgtype.Numeric `db:"price" json:"price"`
+	QueuePrefix            string         `db:"queue_prefix" json:"queue_prefix"`
+	RequiredSpecialization pgtype.Text    `db:"required_specialization" json:"required_specialization"`
+	Status                 string         `db:"status" json:"status"`
+	CreatedBy              pgtype.Int8    `db:"created_by" json:"created_by"`
+}
+
+type CreateServiceRow struct {
+	ID                     int64              `db:"id" json:"id"`
+	Guid                   pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID               int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID               int64              `db:"branch_id" json:"branch_id"`
+	CategoryID             pgtype.Int8        `db:"category_id" json:"category_id"`
+	Name                   string             `db:"name" json:"name"`
+	Description            pgtype.Text        `db:"description" json:"description"`
+	DurationMinutes        int32              `db:"duration_minutes" json:"duration_minutes"`
+	BufferMinutes          int32              `db:"buffer_minutes" json:"buffer_minutes"`
+	Price                  pgtype.Numeric     `db:"price" json:"price"`
+	QueuePrefix            string             `db:"queue_prefix" json:"queue_prefix"`
+	RequiredSpecialization pgtype.Text        `db:"required_specialization" json:"required_specialization"`
+	Status                 string             `db:"status" json:"status"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateService(ctx context.Context, arg CreateServiceParams) (CreateServiceRow, error) {
+	row := q.db.QueryRow(ctx, createService,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.CategoryID,
+		arg.Name,
+		arg.Description,
+		arg.DurationMinutes,
+		arg.BufferMinutes,
+		arg.Price,
+		arg.QueuePrefix,
+		arg.RequiredSpecialization,
+		arg.Status,
+		arg.CreatedBy,
+	)
+	var i CreateServiceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.CategoryID,
+		&i.Name,
+		&i.Description,
+		&i.DurationMinutes,
+		&i.BufferMinutes,
+		&i.Price,
+		&i.QueuePrefix,
+		&i.RequiredSpecialization,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createServiceCategory = `-- name: CreateServiceCategory :one
+INSERT INTO service_categories (guid, tenant_id, name, sort_order, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $5)
+RETURNING id, guid, tenant_id, name, sort_order, created_at
+`
+
+type CreateServiceCategoryParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	TenantID  int64       `db:"tenant_id" json:"tenant_id"`
+	Name      string      `db:"name" json:"name"`
+	SortOrder int16       `db:"sort_order" json:"sort_order"`
+	CreatedBy pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateServiceCategoryRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	Name      string             `db:"name" json:"name"`
+	SortOrder int16              `db:"sort_order" json:"sort_order"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateServiceCategory(ctx context.Context, arg CreateServiceCategoryParams) (CreateServiceCategoryRow, error) {
+	row := q.db.QueryRow(ctx, createServiceCategory,
+		arg.Guid,
+		arg.TenantID,
+		arg.Name,
+		arg.SortOrder,
+		arg.CreatedBy,
+	)
+	var i CreateServiceCategoryRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteService = `-- name: DeleteService :exec
+UPDATE services
+SET deleted_at = NOW(), deleted_by = $2
+WHERE guid = $1 AND deleted_at IS NULL
+`
+
+type DeleteServiceParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	DeletedBy pgtype.Int8 `db:"deleted_by" json:"deleted_by"`
+}
+
+func (q *Queries) DeleteService(ctx context.Context, arg DeleteServiceParams) error {
+	_, err := q.db.Exec(ctx, deleteService, arg.Guid, arg.DeletedBy)
+	return err
+}
+
 const getServiceByGUID = `-- name: GetServiceByGUID :one
 SELECT id, guid, tenant_id, branch_id, category_id, name, description, duration_minutes, buffer_minutes, price, queue_prefix, required_specialization, status, created_at, updated_at
 FROM services
@@ -58,10 +200,55 @@ func (q *Queries) GetServiceByGUID(ctx context.Context, guid pgtype.UUID) (GetSe
 	return i, err
 }
 
+const listServiceCategories = `-- name: ListServiceCategories :many
+SELECT id, guid, tenant_id, name, sort_order, created_at, updated_at
+FROM service_categories
+WHERE tenant_id = $1 AND deleted_at IS NULL
+ORDER BY sort_order ASC, name ASC
+`
+
+type ListServiceCategoriesRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	Name      string             `db:"name" json:"name"`
+	SortOrder int16              `db:"sort_order" json:"sort_order"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListServiceCategories(ctx context.Context, tenantID int64) ([]ListServiceCategoriesRow, error) {
+	rows, err := q.db.Query(ctx, listServiceCategories, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListServiceCategoriesRow{}
+	for rows.Next() {
+		var i ListServiceCategoriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.Name,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listServicesByBranch = `-- name: ListServicesByBranch :many
 SELECT id, guid, tenant_id, branch_id, category_id, name, description, duration_minutes, buffer_minutes, price, queue_prefix, required_specialization, status, created_at, updated_at
 FROM services
-WHERE branch_id = $1 AND status = 'ACTIVE' AND deleted_at IS NULL
+WHERE branch_id = $1 AND deleted_at IS NULL
 ORDER BY name ASC
 `
 
@@ -117,4 +304,79 @@ func (q *Queries) ListServicesByBranch(ctx context.Context, branchID int64) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateService = `-- name: UpdateService :one
+UPDATE services
+SET category_id = $2, name = $3, description = $4, duration_minutes = $5,
+    buffer_minutes = $6, price = $7, queue_prefix = $8, required_specialization = $9,
+    status = $10, updated_at = NOW(), updated_by = $11
+WHERE guid = $1 AND deleted_at IS NULL
+RETURNING id, guid, tenant_id, branch_id, category_id, name, description,
+          duration_minutes, buffer_minutes, price, queue_prefix, required_specialization, status, updated_at
+`
+
+type UpdateServiceParams struct {
+	Guid                   pgtype.UUID    `db:"guid" json:"guid"`
+	CategoryID             pgtype.Int8    `db:"category_id" json:"category_id"`
+	Name                   string         `db:"name" json:"name"`
+	Description            pgtype.Text    `db:"description" json:"description"`
+	DurationMinutes        int32          `db:"duration_minutes" json:"duration_minutes"`
+	BufferMinutes          int32          `db:"buffer_minutes" json:"buffer_minutes"`
+	Price                  pgtype.Numeric `db:"price" json:"price"`
+	QueuePrefix            string         `db:"queue_prefix" json:"queue_prefix"`
+	RequiredSpecialization pgtype.Text    `db:"required_specialization" json:"required_specialization"`
+	Status                 string         `db:"status" json:"status"`
+	UpdatedBy              pgtype.Int8    `db:"updated_by" json:"updated_by"`
+}
+
+type UpdateServiceRow struct {
+	ID                     int64              `db:"id" json:"id"`
+	Guid                   pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID               int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID               int64              `db:"branch_id" json:"branch_id"`
+	CategoryID             pgtype.Int8        `db:"category_id" json:"category_id"`
+	Name                   string             `db:"name" json:"name"`
+	Description            pgtype.Text        `db:"description" json:"description"`
+	DurationMinutes        int32              `db:"duration_minutes" json:"duration_minutes"`
+	BufferMinutes          int32              `db:"buffer_minutes" json:"buffer_minutes"`
+	Price                  pgtype.Numeric     `db:"price" json:"price"`
+	QueuePrefix            string             `db:"queue_prefix" json:"queue_prefix"`
+	RequiredSpecialization pgtype.Text        `db:"required_specialization" json:"required_specialization"`
+	Status                 string             `db:"status" json:"status"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateService(ctx context.Context, arg UpdateServiceParams) (UpdateServiceRow, error) {
+	row := q.db.QueryRow(ctx, updateService,
+		arg.Guid,
+		arg.CategoryID,
+		arg.Name,
+		arg.Description,
+		arg.DurationMinutes,
+		arg.BufferMinutes,
+		arg.Price,
+		arg.QueuePrefix,
+		arg.RequiredSpecialization,
+		arg.Status,
+		arg.UpdatedBy,
+	)
+	var i UpdateServiceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.CategoryID,
+		&i.Name,
+		&i.Description,
+		&i.DurationMinutes,
+		&i.BufferMinutes,
+		&i.Price,
+		&i.QueuePrefix,
+		&i.RequiredSpecialization,
+		&i.Status,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

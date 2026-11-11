@@ -70,6 +70,128 @@ func (q *Queries) CreateBranch(ctx context.Context, arg CreateBranchParams) (Cre
 	return i, err
 }
 
+const createBusinessHour = `-- name: CreateBusinessHour :one
+INSERT INTO business_hours (guid, tenant_id, branch_id, day_of_week, open_time, close_time, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+RETURNING id, guid, tenant_id, branch_id, day_of_week, open_time, close_time, created_at
+`
+
+type CreateBusinessHourParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	TenantID  int64       `db:"tenant_id" json:"tenant_id"`
+	BranchID  int64       `db:"branch_id" json:"branch_id"`
+	DayOfWeek int16       `db:"day_of_week" json:"day_of_week"`
+	OpenTime  pgtype.Time `db:"open_time" json:"open_time"`
+	CloseTime pgtype.Time `db:"close_time" json:"close_time"`
+	CreatedBy pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateBusinessHourRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID  int64              `db:"branch_id" json:"branch_id"`
+	DayOfWeek int16              `db:"day_of_week" json:"day_of_week"`
+	OpenTime  pgtype.Time        `db:"open_time" json:"open_time"`
+	CloseTime pgtype.Time        `db:"close_time" json:"close_time"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateBusinessHour(ctx context.Context, arg CreateBusinessHourParams) (CreateBusinessHourRow, error) {
+	row := q.db.QueryRow(ctx, createBusinessHour,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.DayOfWeek,
+		arg.OpenTime,
+		arg.CloseTime,
+		arg.CreatedBy,
+	)
+	var i CreateBusinessHourRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.DayOfWeek,
+		&i.OpenTime,
+		&i.CloseTime,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createCounter = `-- name: CreateCounter :one
+INSERT INTO service_counters (guid, tenant_id, branch_id, code, name, display_order, status, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+RETURNING id, guid, tenant_id, branch_id, code, name, display_order, status, created_at
+`
+
+type CreateCounterParams struct {
+	Guid         pgtype.UUID `db:"guid" json:"guid"`
+	TenantID     int64       `db:"tenant_id" json:"tenant_id"`
+	BranchID     int64       `db:"branch_id" json:"branch_id"`
+	Code         string      `db:"code" json:"code"`
+	Name         string      `db:"name" json:"name"`
+	DisplayOrder int16       `db:"display_order" json:"display_order"`
+	Status       string      `db:"status" json:"status"`
+	CreatedBy    pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateCounterRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Guid         pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID     int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID     int64              `db:"branch_id" json:"branch_id"`
+	Code         string             `db:"code" json:"code"`
+	Name         string             `db:"name" json:"name"`
+	DisplayOrder int16              `db:"display_order" json:"display_order"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateCounter(ctx context.Context, arg CreateCounterParams) (CreateCounterRow, error) {
+	row := q.db.QueryRow(ctx, createCounter,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.Code,
+		arg.Name,
+		arg.DisplayOrder,
+		arg.Status,
+		arg.CreatedBy,
+	)
+	var i CreateCounterRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.Code,
+		&i.Name,
+		&i.DisplayOrder,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteBusinessHoursByBranch = `-- name: DeleteBusinessHoursByBranch :exec
+UPDATE business_hours
+SET deleted_at = NOW(), deleted_by = $2
+WHERE branch_id = $1 AND deleted_at IS NULL
+`
+
+type DeleteBusinessHoursByBranchParams struct {
+	BranchID  int64       `db:"branch_id" json:"branch_id"`
+	DeletedBy pgtype.Int8 `db:"deleted_by" json:"deleted_by"`
+}
+
+func (q *Queries) DeleteBusinessHoursByBranch(ctx context.Context, arg DeleteBusinessHoursByBranchParams) error {
+	_, err := q.db.Exec(ctx, deleteBusinessHoursByBranch, arg.BranchID, arg.DeletedBy)
+	return err
+}
+
 const getBranchByGUID = `-- name: GetBranchByGUID :one
 SELECT id, guid, tenant_id, code, name, address, phone, timezone, status, created_at, updated_at
 FROM branches
@@ -102,6 +224,93 @@ func (q *Queries) GetBranchByGUID(ctx context.Context, guid pgtype.UUID) (GetBra
 		&i.Address,
 		&i.Phone,
 		&i.Timezone,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getBranchSettings = `-- name: GetBranchSettings :one
+SELECT id, guid, tenant_id, branch_id, change_cutoff_minutes, check_in_open_before_minutes,
+       check_in_close_after_minutes, no_show_after_minutes, slot_step_minutes,
+       appointment_priority, walk_in_priority, late_grace_minutes, notify_before_queue_count,
+       created_at, updated_at
+FROM branch_settings
+WHERE branch_id = $1 AND deleted_at IS NULL
+`
+
+type GetBranchSettingsRow struct {
+	ID                       int64              `db:"id" json:"id"`
+	Guid                     pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID                 int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID                 int64              `db:"branch_id" json:"branch_id"`
+	ChangeCutoffMinutes      int32              `db:"change_cutoff_minutes" json:"change_cutoff_minutes"`
+	CheckInOpenBeforeMinutes int32              `db:"check_in_open_before_minutes" json:"check_in_open_before_minutes"`
+	CheckInCloseAfterMinutes int32              `db:"check_in_close_after_minutes" json:"check_in_close_after_minutes"`
+	NoShowAfterMinutes       int32              `db:"no_show_after_minutes" json:"no_show_after_minutes"`
+	SlotStepMinutes          int16              `db:"slot_step_minutes" json:"slot_step_minutes"`
+	AppointmentPriority      int16              `db:"appointment_priority" json:"appointment_priority"`
+	WalkInPriority           int16              `db:"walk_in_priority" json:"walk_in_priority"`
+	LateGraceMinutes         pgtype.Int4        `db:"late_grace_minutes" json:"late_grace_minutes"`
+	NotifyBeforeQueueCount   int16              `db:"notify_before_queue_count" json:"notify_before_queue_count"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBranchSettings(ctx context.Context, branchID int64) (GetBranchSettingsRow, error) {
+	row := q.db.QueryRow(ctx, getBranchSettings, branchID)
+	var i GetBranchSettingsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.ChangeCutoffMinutes,
+		&i.CheckInOpenBeforeMinutes,
+		&i.CheckInCloseAfterMinutes,
+		&i.NoShowAfterMinutes,
+		&i.SlotStepMinutes,
+		&i.AppointmentPriority,
+		&i.WalkInPriority,
+		&i.LateGraceMinutes,
+		&i.NotifyBeforeQueueCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCounterByGUID = `-- name: GetCounterByGUID :one
+SELECT id, guid, tenant_id, branch_id, code, name, display_order, status, created_at, updated_at
+FROM service_counters
+WHERE guid = $1 AND deleted_at IS NULL
+`
+
+type GetCounterByGUIDRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Guid         pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID     int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID     int64              `db:"branch_id" json:"branch_id"`
+	Code         string             `db:"code" json:"code"`
+	Name         string             `db:"name" json:"name"`
+	DisplayOrder int16              `db:"display_order" json:"display_order"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetCounterByGUID(ctx context.Context, guid pgtype.UUID) (GetCounterByGUIDRow, error) {
+	row := q.db.QueryRow(ctx, getCounterByGUID, guid)
+	var i GetCounterByGUIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.Code,
+		&i.Name,
+		&i.DisplayOrder,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -160,4 +369,256 @@ func (q *Queries) ListBranchesByTenant(ctx context.Context, tenantID int64) ([]L
 		return nil, err
 	}
 	return items, nil
+}
+
+const listBusinessHoursByBranch = `-- name: ListBusinessHoursByBranch :many
+SELECT id, guid, tenant_id, branch_id, day_of_week, open_time, close_time, created_at, updated_at
+FROM business_hours
+WHERE branch_id = $1 AND deleted_at IS NULL
+ORDER BY day_of_week ASC, open_time ASC
+`
+
+type ListBusinessHoursByBranchRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID  int64              `db:"branch_id" json:"branch_id"`
+	DayOfWeek int16              `db:"day_of_week" json:"day_of_week"`
+	OpenTime  pgtype.Time        `db:"open_time" json:"open_time"`
+	CloseTime pgtype.Time        `db:"close_time" json:"close_time"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListBusinessHoursByBranch(ctx context.Context, branchID int64) ([]ListBusinessHoursByBranchRow, error) {
+	rows, err := q.db.Query(ctx, listBusinessHoursByBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBusinessHoursByBranchRow{}
+	for rows.Next() {
+		var i ListBusinessHoursByBranchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.BranchID,
+			&i.DayOfWeek,
+			&i.OpenTime,
+			&i.CloseTime,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCountersByBranch = `-- name: ListCountersByBranch :many
+SELECT id, guid, tenant_id, branch_id, code, name, display_order, status, created_at, updated_at
+FROM service_counters
+WHERE branch_id = $1 AND deleted_at IS NULL
+ORDER BY display_order ASC, code ASC
+`
+
+type ListCountersByBranchRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Guid         pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID     int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID     int64              `db:"branch_id" json:"branch_id"`
+	Code         string             `db:"code" json:"code"`
+	Name         string             `db:"name" json:"name"`
+	DisplayOrder int16              `db:"display_order" json:"display_order"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListCountersByBranch(ctx context.Context, branchID int64) ([]ListCountersByBranchRow, error) {
+	rows, err := q.db.Query(ctx, listCountersByBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCountersByBranchRow{}
+	for rows.Next() {
+		var i ListCountersByBranchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.BranchID,
+			&i.Code,
+			&i.Name,
+			&i.DisplayOrder,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateCounter = `-- name: UpdateCounter :one
+UPDATE service_counters
+SET name = $2, display_order = $3, status = $4, updated_at = NOW(), updated_by = $5
+WHERE guid = $1 AND deleted_at IS NULL
+RETURNING id, guid, tenant_id, branch_id, code, name, display_order, status, updated_at
+`
+
+type UpdateCounterParams struct {
+	Guid         pgtype.UUID `db:"guid" json:"guid"`
+	Name         string      `db:"name" json:"name"`
+	DisplayOrder int16       `db:"display_order" json:"display_order"`
+	Status       string      `db:"status" json:"status"`
+	UpdatedBy    pgtype.Int8 `db:"updated_by" json:"updated_by"`
+}
+
+type UpdateCounterRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Guid         pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID     int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID     int64              `db:"branch_id" json:"branch_id"`
+	Code         string             `db:"code" json:"code"`
+	Name         string             `db:"name" json:"name"`
+	DisplayOrder int16              `db:"display_order" json:"display_order"`
+	Status       string             `db:"status" json:"status"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateCounter(ctx context.Context, arg UpdateCounterParams) (UpdateCounterRow, error) {
+	row := q.db.QueryRow(ctx, updateCounter,
+		arg.Guid,
+		arg.Name,
+		arg.DisplayOrder,
+		arg.Status,
+		arg.UpdatedBy,
+	)
+	var i UpdateCounterRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.Code,
+		&i.Name,
+		&i.DisplayOrder,
+		&i.Status,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertBranchSettings = `-- name: UpsertBranchSettings :one
+INSERT INTO branch_settings (
+    guid, tenant_id, branch_id, change_cutoff_minutes, check_in_open_before_minutes,
+    check_in_close_after_minutes, no_show_after_minutes, slot_step_minutes,
+    appointment_priority, walk_in_priority, late_grace_minutes, notify_before_queue_count,
+    created_by, updated_by
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8,
+    $9, $10, $11, $12,
+    $13, $13
+)
+ON CONFLICT (branch_id) WHERE deleted_at IS NULL
+DO UPDATE SET
+    change_cutoff_minutes = EXCLUDED.change_cutoff_minutes,
+    check_in_open_before_minutes = EXCLUDED.check_in_open_before_minutes,
+    check_in_close_after_minutes = EXCLUDED.check_in_close_after_minutes,
+    no_show_after_minutes = EXCLUDED.no_show_after_minutes,
+    slot_step_minutes = EXCLUDED.slot_step_minutes,
+    appointment_priority = EXCLUDED.appointment_priority,
+    walk_in_priority = EXCLUDED.walk_in_priority,
+    late_grace_minutes = EXCLUDED.late_grace_minutes,
+    notify_before_queue_count = EXCLUDED.notify_before_queue_count,
+    updated_at = NOW(),
+    updated_by = EXCLUDED.updated_by
+RETURNING id, guid, tenant_id, branch_id, change_cutoff_minutes, check_in_open_before_minutes,
+          check_in_close_after_minutes, no_show_after_minutes, slot_step_minutes,
+          appointment_priority, walk_in_priority, late_grace_minutes, notify_before_queue_count,
+          created_at, updated_at
+`
+
+type UpsertBranchSettingsParams struct {
+	Guid                     pgtype.UUID `db:"guid" json:"guid"`
+	TenantID                 int64       `db:"tenant_id" json:"tenant_id"`
+	BranchID                 int64       `db:"branch_id" json:"branch_id"`
+	ChangeCutoffMinutes      int32       `db:"change_cutoff_minutes" json:"change_cutoff_minutes"`
+	CheckInOpenBeforeMinutes int32       `db:"check_in_open_before_minutes" json:"check_in_open_before_minutes"`
+	CheckInCloseAfterMinutes int32       `db:"check_in_close_after_minutes" json:"check_in_close_after_minutes"`
+	NoShowAfterMinutes       int32       `db:"no_show_after_minutes" json:"no_show_after_minutes"`
+	SlotStepMinutes          int16       `db:"slot_step_minutes" json:"slot_step_minutes"`
+	AppointmentPriority      int16       `db:"appointment_priority" json:"appointment_priority"`
+	WalkInPriority           int16       `db:"walk_in_priority" json:"walk_in_priority"`
+	LateGraceMinutes         pgtype.Int4 `db:"late_grace_minutes" json:"late_grace_minutes"`
+	NotifyBeforeQueueCount   int16       `db:"notify_before_queue_count" json:"notify_before_queue_count"`
+	CreatedBy                pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type UpsertBranchSettingsRow struct {
+	ID                       int64              `db:"id" json:"id"`
+	Guid                     pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID                 int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID                 int64              `db:"branch_id" json:"branch_id"`
+	ChangeCutoffMinutes      int32              `db:"change_cutoff_minutes" json:"change_cutoff_minutes"`
+	CheckInOpenBeforeMinutes int32              `db:"check_in_open_before_minutes" json:"check_in_open_before_minutes"`
+	CheckInCloseAfterMinutes int32              `db:"check_in_close_after_minutes" json:"check_in_close_after_minutes"`
+	NoShowAfterMinutes       int32              `db:"no_show_after_minutes" json:"no_show_after_minutes"`
+	SlotStepMinutes          int16              `db:"slot_step_minutes" json:"slot_step_minutes"`
+	AppointmentPriority      int16              `db:"appointment_priority" json:"appointment_priority"`
+	WalkInPriority           int16              `db:"walk_in_priority" json:"walk_in_priority"`
+	LateGraceMinutes         pgtype.Int4        `db:"late_grace_minutes" json:"late_grace_minutes"`
+	NotifyBeforeQueueCount   int16              `db:"notify_before_queue_count" json:"notify_before_queue_count"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpsertBranchSettings(ctx context.Context, arg UpsertBranchSettingsParams) (UpsertBranchSettingsRow, error) {
+	row := q.db.QueryRow(ctx, upsertBranchSettings,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.ChangeCutoffMinutes,
+		arg.CheckInOpenBeforeMinutes,
+		arg.CheckInCloseAfterMinutes,
+		arg.NoShowAfterMinutes,
+		arg.SlotStepMinutes,
+		arg.AppointmentPriority,
+		arg.WalkInPriority,
+		arg.LateGraceMinutes,
+		arg.NotifyBeforeQueueCount,
+		arg.CreatedBy,
+	)
+	var i UpsertBranchSettingsRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.ChangeCutoffMinutes,
+		&i.CheckInOpenBeforeMinutes,
+		&i.CheckInCloseAfterMinutes,
+		&i.NoShowAfterMinutes,
+		&i.SlotStepMinutes,
+		&i.AppointmentPriority,
+		&i.WalkInPriority,
+		&i.LateGraceMinutes,
+		&i.NotifyBeforeQueueCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

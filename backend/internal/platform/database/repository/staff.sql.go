@@ -11,6 +11,287 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const assignStaffService = `-- name: AssignStaffService :one
+INSERT INTO staff_services (guid, tenant_id, staff_id, service_id, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $5)
+RETURNING id, guid, tenant_id, staff_id, service_id, created_at
+`
+
+type AssignStaffServiceParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	TenantID  int64       `db:"tenant_id" json:"tenant_id"`
+	StaffID   int64       `db:"staff_id" json:"staff_id"`
+	ServiceID int64       `db:"service_id" json:"service_id"`
+	CreatedBy pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type AssignStaffServiceRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Guid      pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID  int64              `db:"tenant_id" json:"tenant_id"`
+	StaffID   int64              `db:"staff_id" json:"staff_id"`
+	ServiceID int64              `db:"service_id" json:"service_id"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) AssignStaffService(ctx context.Context, arg AssignStaffServiceParams) (AssignStaffServiceRow, error) {
+	row := q.db.QueryRow(ctx, assignStaffService,
+		arg.Guid,
+		arg.TenantID,
+		arg.StaffID,
+		arg.ServiceID,
+		arg.CreatedBy,
+	)
+	var i AssignStaffServiceRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.StaffID,
+		&i.ServiceID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const countActiveUpcomingAppointmentsByStaff = `-- name: CountActiveUpcomingAppointmentsByStaff :one
+SELECT COUNT(*)::bigint as active_count
+FROM appointments
+WHERE staff_id = $1
+  AND status = 'CONFIRMED'
+  AND end_at > $2
+  AND deleted_at IS NULL
+`
+
+type CountActiveUpcomingAppointmentsByStaffParams struct {
+	StaffID int64              `db:"staff_id" json:"staff_id"`
+	EndAt   pgtype.Timestamptz `db:"end_at" json:"end_at"`
+}
+
+func (q *Queries) CountActiveUpcomingAppointmentsByStaff(ctx context.Context, arg CountActiveUpcomingAppointmentsByStaffParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveUpcomingAppointmentsByStaff, arg.StaffID, arg.EndAt)
+	var active_count int64
+	err := row.Scan(&active_count)
+	return active_count, err
+}
+
+const createScheduleException = `-- name: CreateScheduleException :one
+INSERT INTO schedule_exceptions (
+    guid, tenant_id, branch_id, staff_id, exception_type,
+    start_date, end_date, start_time, end_time, reason, created_by, updated_by
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10, $11, $11
+)
+RETURNING id, guid, tenant_id, branch_id, staff_id, exception_type,
+          start_date, end_date, start_time, end_time, reason, created_at
+`
+
+type CreateScheduleExceptionParams struct {
+	Guid          pgtype.UUID `db:"guid" json:"guid"`
+	TenantID      int64       `db:"tenant_id" json:"tenant_id"`
+	BranchID      int64       `db:"branch_id" json:"branch_id"`
+	StaffID       pgtype.Int8 `db:"staff_id" json:"staff_id"`
+	ExceptionType string      `db:"exception_type" json:"exception_type"`
+	StartDate     pgtype.Date `db:"start_date" json:"start_date"`
+	EndDate       pgtype.Date `db:"end_date" json:"end_date"`
+	StartTime     pgtype.Time `db:"start_time" json:"start_time"`
+	EndTime       pgtype.Time `db:"end_time" json:"end_time"`
+	Reason        pgtype.Text `db:"reason" json:"reason"`
+	CreatedBy     pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateScheduleExceptionRow struct {
+	ID            int64              `db:"id" json:"id"`
+	Guid          pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID      int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID      int64              `db:"branch_id" json:"branch_id"`
+	StaffID       pgtype.Int8        `db:"staff_id" json:"staff_id"`
+	ExceptionType string             `db:"exception_type" json:"exception_type"`
+	StartDate     pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate       pgtype.Date        `db:"end_date" json:"end_date"`
+	StartTime     pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime       pgtype.Time        `db:"end_time" json:"end_time"`
+	Reason        pgtype.Text        `db:"reason" json:"reason"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateScheduleException(ctx context.Context, arg CreateScheduleExceptionParams) (CreateScheduleExceptionRow, error) {
+	row := q.db.QueryRow(ctx, createScheduleException,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.StaffID,
+		arg.ExceptionType,
+		arg.StartDate,
+		arg.EndDate,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Reason,
+		arg.CreatedBy,
+	)
+	var i CreateScheduleExceptionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.StaffID,
+		&i.ExceptionType,
+		&i.StartDate,
+		&i.EndDate,
+		&i.StartTime,
+		&i.EndTime,
+		&i.Reason,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createStaffProfile = `-- name: CreateStaffProfile :one
+INSERT INTO staff_profiles (guid, tenant_id, branch_id, user_id, display_name, specialization, status, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+RETURNING id, guid, tenant_id, branch_id, user_id, display_name, specialization, status, created_at
+`
+
+type CreateStaffProfileParams struct {
+	Guid           pgtype.UUID `db:"guid" json:"guid"`
+	TenantID       int64       `db:"tenant_id" json:"tenant_id"`
+	BranchID       int64       `db:"branch_id" json:"branch_id"`
+	UserID         int64       `db:"user_id" json:"user_id"`
+	DisplayName    string      `db:"display_name" json:"display_name"`
+	Specialization pgtype.Text `db:"specialization" json:"specialization"`
+	Status         string      `db:"status" json:"status"`
+	CreatedBy      pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateStaffProfileRow struct {
+	ID             int64              `db:"id" json:"id"`
+	Guid           pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID       int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID       int64              `db:"branch_id" json:"branch_id"`
+	UserID         int64              `db:"user_id" json:"user_id"`
+	DisplayName    string             `db:"display_name" json:"display_name"`
+	Specialization pgtype.Text        `db:"specialization" json:"specialization"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateStaffProfile(ctx context.Context, arg CreateStaffProfileParams) (CreateStaffProfileRow, error) {
+	row := q.db.QueryRow(ctx, createStaffProfile,
+		arg.Guid,
+		arg.TenantID,
+		arg.BranchID,
+		arg.UserID,
+		arg.DisplayName,
+		arg.Specialization,
+		arg.Status,
+		arg.CreatedBy,
+	)
+	var i CreateStaffProfileRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Specialization,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createStaffSchedule = `-- name: CreateStaffSchedule :one
+INSERT INTO staff_schedules (
+    guid, tenant_id, staff_id, day_of_week, start_time, end_time,
+    break_start, break_end, valid_from, valid_until, created_by, updated_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6,
+    $7, $8, $9, $10, $11, $11
+)
+RETURNING id, guid, tenant_id, staff_id, day_of_week, start_time, end_time,
+          break_start, break_end, valid_from, valid_until, created_at
+`
+
+type CreateStaffScheduleParams struct {
+	Guid       pgtype.UUID `db:"guid" json:"guid"`
+	TenantID   int64       `db:"tenant_id" json:"tenant_id"`
+	StaffID    int64       `db:"staff_id" json:"staff_id"`
+	DayOfWeek  int16       `db:"day_of_week" json:"day_of_week"`
+	StartTime  pgtype.Time `db:"start_time" json:"start_time"`
+	EndTime    pgtype.Time `db:"end_time" json:"end_time"`
+	BreakStart pgtype.Time `db:"break_start" json:"break_start"`
+	BreakEnd   pgtype.Time `db:"break_end" json:"break_end"`
+	ValidFrom  pgtype.Date `db:"valid_from" json:"valid_from"`
+	ValidUntil pgtype.Date `db:"valid_until" json:"valid_until"`
+	CreatedBy  pgtype.Int8 `db:"created_by" json:"created_by"`
+}
+
+type CreateStaffScheduleRow struct {
+	ID         int64              `db:"id" json:"id"`
+	Guid       pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID   int64              `db:"tenant_id" json:"tenant_id"`
+	StaffID    int64              `db:"staff_id" json:"staff_id"`
+	DayOfWeek  int16              `db:"day_of_week" json:"day_of_week"`
+	StartTime  pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime    pgtype.Time        `db:"end_time" json:"end_time"`
+	BreakStart pgtype.Time        `db:"break_start" json:"break_start"`
+	BreakEnd   pgtype.Time        `db:"break_end" json:"break_end"`
+	ValidFrom  pgtype.Date        `db:"valid_from" json:"valid_from"`
+	ValidUntil pgtype.Date        `db:"valid_until" json:"valid_until"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) CreateStaffSchedule(ctx context.Context, arg CreateStaffScheduleParams) (CreateStaffScheduleRow, error) {
+	row := q.db.QueryRow(ctx, createStaffSchedule,
+		arg.Guid,
+		arg.TenantID,
+		arg.StaffID,
+		arg.DayOfWeek,
+		arg.StartTime,
+		arg.EndTime,
+		arg.BreakStart,
+		arg.BreakEnd,
+		arg.ValidFrom,
+		arg.ValidUntil,
+		arg.CreatedBy,
+	)
+	var i CreateStaffScheduleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.StaffID,
+		&i.DayOfWeek,
+		&i.StartTime,
+		&i.EndTime,
+		&i.BreakStart,
+		&i.BreakEnd,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteStaffSchedulesByStaffID = `-- name: DeleteStaffSchedulesByStaffID :exec
+UPDATE staff_schedules
+SET deleted_at = NOW(), deleted_by = $2
+WHERE staff_id = $1 AND deleted_at IS NULL
+`
+
+type DeleteStaffSchedulesByStaffIDParams struct {
+	StaffID   int64       `db:"staff_id" json:"staff_id"`
+	DeletedBy pgtype.Int8 `db:"deleted_by" json:"deleted_by"`
+}
+
+func (q *Queries) DeleteStaffSchedulesByStaffID(ctx context.Context, arg DeleteStaffSchedulesByStaffIDParams) error {
+	_, err := q.db.Exec(ctx, deleteStaffSchedulesByStaffID, arg.StaffID, arg.DeletedBy)
+	return err
+}
+
 const getStaffProfileByGUID = `-- name: GetStaffProfileByGUID :one
 SELECT id, guid, tenant_id, branch_id, user_id, display_name, specialization, status, created_at, updated_at
 FROM staff_profiles
@@ -46,6 +327,113 @@ func (q *Queries) GetStaffProfileByGUID(ctx context.Context, guid pgtype.UUID) (
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listScheduleExceptionsByBranch = `-- name: ListScheduleExceptionsByBranch :many
+SELECT id, guid, tenant_id, branch_id, staff_id, exception_type,
+       start_date, end_date, start_time, end_time, reason, created_at
+FROM schedule_exceptions
+WHERE branch_id = $1 AND deleted_at IS NULL
+ORDER BY start_date ASC
+`
+
+type ListScheduleExceptionsByBranchRow struct {
+	ID            int64              `db:"id" json:"id"`
+	Guid          pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID      int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID      int64              `db:"branch_id" json:"branch_id"`
+	StaffID       pgtype.Int8        `db:"staff_id" json:"staff_id"`
+	ExceptionType string             `db:"exception_type" json:"exception_type"`
+	StartDate     pgtype.Date        `db:"start_date" json:"start_date"`
+	EndDate       pgtype.Date        `db:"end_date" json:"end_date"`
+	StartTime     pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime       pgtype.Time        `db:"end_time" json:"end_time"`
+	Reason        pgtype.Text        `db:"reason" json:"reason"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListScheduleExceptionsByBranch(ctx context.Context, branchID int64) ([]ListScheduleExceptionsByBranchRow, error) {
+	rows, err := q.db.Query(ctx, listScheduleExceptionsByBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListScheduleExceptionsByBranchRow{}
+	for rows.Next() {
+		var i ListScheduleExceptionsByBranchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.BranchID,
+			&i.StaffID,
+			&i.ExceptionType,
+			&i.StartDate,
+			&i.EndDate,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Reason,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaffByBranch = `-- name: ListStaffByBranch :many
+SELECT id, guid, tenant_id, branch_id, user_id, display_name, specialization, status, created_at, updated_at
+FROM staff_profiles
+WHERE branch_id = $1 AND deleted_at IS NULL
+ORDER BY display_name ASC
+`
+
+type ListStaffByBranchRow struct {
+	ID             int64              `db:"id" json:"id"`
+	Guid           pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID       int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID       int64              `db:"branch_id" json:"branch_id"`
+	UserID         int64              `db:"user_id" json:"user_id"`
+	DisplayName    string             `db:"display_name" json:"display_name"`
+	Specialization pgtype.Text        `db:"specialization" json:"specialization"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListStaffByBranch(ctx context.Context, branchID int64) ([]ListStaffByBranchRow, error) {
+	rows, err := q.db.Query(ctx, listStaffByBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffByBranchRow{}
+	for rows.Next() {
+		var i ListStaffByBranchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.BranchID,
+			&i.UserID,
+			&i.DisplayName,
+			&i.Specialization,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listStaffByBranchAndService = `-- name: ListStaffByBranchAndService :many
@@ -103,4 +491,165 @@ func (q *Queries) ListStaffByBranchAndService(ctx context.Context, arg ListStaff
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStaffSchedules = `-- name: ListStaffSchedules :many
+SELECT id, guid, tenant_id, staff_id, day_of_week, start_time, end_time,
+       break_start, break_end, valid_from, valid_until, created_at
+FROM staff_schedules
+WHERE staff_id = $1 AND deleted_at IS NULL
+ORDER BY day_of_week ASC, start_time ASC
+`
+
+type ListStaffSchedulesRow struct {
+	ID         int64              `db:"id" json:"id"`
+	Guid       pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID   int64              `db:"tenant_id" json:"tenant_id"`
+	StaffID    int64              `db:"staff_id" json:"staff_id"`
+	DayOfWeek  int16              `db:"day_of_week" json:"day_of_week"`
+	StartTime  pgtype.Time        `db:"start_time" json:"start_time"`
+	EndTime    pgtype.Time        `db:"end_time" json:"end_time"`
+	BreakStart pgtype.Time        `db:"break_start" json:"break_start"`
+	BreakEnd   pgtype.Time        `db:"break_end" json:"break_end"`
+	ValidFrom  pgtype.Date        `db:"valid_from" json:"valid_from"`
+	ValidUntil pgtype.Date        `db:"valid_until" json:"valid_until"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListStaffSchedules(ctx context.Context, staffID int64) ([]ListStaffSchedulesRow, error) {
+	rows, err := q.db.Query(ctx, listStaffSchedules, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffSchedulesRow{}
+	for rows.Next() {
+		var i ListStaffSchedulesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.StaffID,
+			&i.DayOfWeek,
+			&i.StartTime,
+			&i.EndTime,
+			&i.BreakStart,
+			&i.BreakEnd,
+			&i.ValidFrom,
+			&i.ValidUntil,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaffServices = `-- name: ListStaffServices :many
+SELECT ss.id, ss.guid, ss.tenant_id, ss.staff_id, ss.service_id,
+       s.guid as service_guid, s.name as service_name
+FROM staff_services ss
+INNER JOIN services s ON ss.service_id = s.id AND s.deleted_at IS NULL
+WHERE ss.staff_id = $1 AND ss.deleted_at IS NULL
+ORDER BY s.name ASC
+`
+
+type ListStaffServicesRow struct {
+	ID          int64       `db:"id" json:"id"`
+	Guid        pgtype.UUID `db:"guid" json:"guid"`
+	TenantID    int64       `db:"tenant_id" json:"tenant_id"`
+	StaffID     int64       `db:"staff_id" json:"staff_id"`
+	ServiceID   int64       `db:"service_id" json:"service_id"`
+	ServiceGuid pgtype.UUID `db:"service_guid" json:"service_guid"`
+	ServiceName string      `db:"service_name" json:"service_name"`
+}
+
+func (q *Queries) ListStaffServices(ctx context.Context, staffID int64) ([]ListStaffServicesRow, error) {
+	rows, err := q.db.Query(ctx, listStaffServices, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaffServicesRow{}
+	for rows.Next() {
+		var i ListStaffServicesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Guid,
+			&i.TenantID,
+			&i.StaffID,
+			&i.ServiceID,
+			&i.ServiceGuid,
+			&i.ServiceName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeStaffServicesByStaffID = `-- name: RemoveStaffServicesByStaffID :exec
+UPDATE staff_services
+SET deleted_at = NOW(), deleted_by = $2
+WHERE staff_id = $1 AND deleted_at IS NULL
+`
+
+type RemoveStaffServicesByStaffIDParams struct {
+	StaffID   int64       `db:"staff_id" json:"staff_id"`
+	DeletedBy pgtype.Int8 `db:"deleted_by" json:"deleted_by"`
+}
+
+func (q *Queries) RemoveStaffServicesByStaffID(ctx context.Context, arg RemoveStaffServicesByStaffIDParams) error {
+	_, err := q.db.Exec(ctx, removeStaffServicesByStaffID, arg.StaffID, arg.DeletedBy)
+	return err
+}
+
+const updateStaffProfileStatus = `-- name: UpdateStaffProfileStatus :one
+UPDATE staff_profiles
+SET status = $2, updated_at = NOW(), updated_by = $3
+WHERE guid = $1 AND deleted_at IS NULL
+RETURNING id, guid, tenant_id, branch_id, user_id, display_name, specialization, status, updated_at
+`
+
+type UpdateStaffProfileStatusParams struct {
+	Guid      pgtype.UUID `db:"guid" json:"guid"`
+	Status    string      `db:"status" json:"status"`
+	UpdatedBy pgtype.Int8 `db:"updated_by" json:"updated_by"`
+}
+
+type UpdateStaffProfileStatusRow struct {
+	ID             int64              `db:"id" json:"id"`
+	Guid           pgtype.UUID        `db:"guid" json:"guid"`
+	TenantID       int64              `db:"tenant_id" json:"tenant_id"`
+	BranchID       int64              `db:"branch_id" json:"branch_id"`
+	UserID         int64              `db:"user_id" json:"user_id"`
+	DisplayName    string             `db:"display_name" json:"display_name"`
+	Specialization pgtype.Text        `db:"specialization" json:"specialization"`
+	Status         string             `db:"status" json:"status"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) UpdateStaffProfileStatus(ctx context.Context, arg UpdateStaffProfileStatusParams) (UpdateStaffProfileStatusRow, error) {
+	row := q.db.QueryRow(ctx, updateStaffProfileStatus, arg.Guid, arg.Status, arg.UpdatedBy)
+	var i UpdateStaffProfileStatusRow
+	err := row.Scan(
+		&i.ID,
+		&i.Guid,
+		&i.TenantID,
+		&i.BranchID,
+		&i.UserID,
+		&i.DisplayName,
+		&i.Specialization,
+		&i.Status,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
