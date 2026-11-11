@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"context"
@@ -9,13 +9,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
 )
 
-func getTestDBAndRedis(t *testing.T) (*Service, *pgxpool.Pool) {
+func getTestDBAndRedis(t *testing.T) (*AuthService, *pgxpool.Pool) {
 	t.Helper()
 
 	dbURL := os.Getenv("DATABASE_URL")
@@ -40,7 +42,7 @@ func getTestDBAndRedis(t *testing.T) (*Service, *pgxpool.Pool) {
 	}
 
 	tokenManager := token.NewTokenManager("test-super-secret-key-at-least-32-chars!", 15*time.Minute)
-	svc := NewService(pool, sessionStore, tokenManager, 14*24*time.Hour)
+	svc := NewAuthService(pool, sessionStore, tokenManager, 14*24*time.Hour)
 
 	return svc, pool
 }
@@ -55,7 +57,7 @@ func TestRegisterTenantAndLogin(t *testing.T) {
 	password := "Secret123!"
 
 	// 1. Register Tenant
-	regResult, err := svc.RegisterTenant(ctx, RegisterTenantInput{
+	regResult, err := svc.RegisterTenant(ctx, payload.RegisterTenantPayload{
 		TenantName:    "Bengkel Maju Jaya",
 		TenantSlug:    slug,
 		BusinessType:  "WORKSHOP",
@@ -76,7 +78,10 @@ func TestRegisterTenantAndLogin(t *testing.T) {
 	}
 
 	// 2. Login
-	loginResult, err := svc.Login(ctx, email, password)
+	loginResult, err := svc.Login(ctx, payload.LoginPayload{
+		Email:    email,
+		Password: password,
+	})
 	if err != nil {
 		t.Fatalf("failed to login: %v", err)
 	}
@@ -87,8 +92,8 @@ func TestRegisterTenantAndLogin(t *testing.T) {
 	if loginResult.RefreshToken == "" {
 		t.Fatal("expected non-empty refresh token")
 	}
-	if loginResult.Role != "TENANT_ADMIN" {
-		t.Errorf("expected role TENANT_ADMIN, got %s", loginResult.Role)
+	if loginResult.User.Role != "TENANT_ADMIN" {
+		t.Errorf("expected role TENANT_ADMIN, got %s", loginResult.User.Role)
 	}
 
 	// 3. Verify Refresh Token in Redis
@@ -96,8 +101,8 @@ func TestRegisterTenantAndLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("refresh token validation in redis failed: %v", err)
 	}
-	if userGUID != loginResult.UserGUID.String() {
-		t.Errorf("expected user guid in redis %s, got %s", loginResult.UserGUID.String(), userGUID)
+	if userGUID != loginResult.User.GUID.String() {
+		t.Errorf("expected user guid in redis %s, got %s", loginResult.User.GUID.String(), userGUID)
 	}
 }
 
@@ -110,7 +115,7 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 	// Register Tenant A
 	slugA := "tenant-a-" + uuid.NewString()[:8]
 	emailA := "admin-" + uuid.NewString()[:8] + "@alpha.com"
-	resA, err := svc.RegisterTenant(ctx, RegisterTenantInput{
+	resA, err := svc.RegisterTenant(ctx, payload.RegisterTenantPayload{
 		TenantName:    "Tenant Alpha",
 		TenantSlug:    slugA,
 		ContactEmail:  emailA,
@@ -127,7 +132,7 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 	// Register Tenant B
 	slugB := "tenant-b-" + uuid.NewString()[:8]
 	emailB := "admin-" + uuid.NewString()[:8] + "@beta.com"
-	resB, err := svc.RegisterTenant(ctx, RegisterTenantInput{
+	resB, err := svc.RegisterTenant(ctx, payload.RegisterTenantPayload{
 		TenantName:    "Tenant Beta",
 		TenantSlug:    slugB,
 		ContactEmail:  emailB,
@@ -152,7 +157,6 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 	})
 
 	// Query with Tenant A context:
-	// Tenant A should only see branches with code "ALPHA-01"
 	err = database.WithTx(ctx, pool, &tenantIDA, func(tx pgx.Tx, q *repository.Queries) error {
 		branches, err := q.ListBranchesByTenant(ctx, tenantIDA)
 		if err != nil {
@@ -167,7 +171,6 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		// RLS MUST filter out all rows because tenant_id doesn't match session!
 		if len(leakBranches) != 0 {
 			t.Fatalf("RLS VIOLATION: Tenant A saw %d branches belonging to Tenant B!", len(leakBranches))
 		}
@@ -179,7 +182,6 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 
 	// Query with Tenant B context:
 	err = database.WithTx(ctx, pool, &tenantIDB, func(tx pgx.Tx, q *repository.Queries) error {
-		// Malicious attempt: Query Tenant A's ID while in Tenant B's RLS session
 		leakBranches, err := q.ListBranchesByTenant(ctx, tenantIDA)
 		if err != nil {
 			return err

@@ -93,35 +93,40 @@ Prinsip arsitektur:
 ### 3.1 Struktur Proyek
 
 ```
-quevia-backend/
+backend/
 ├── cmd/
 │   ├── api/main.go
 │   └── worker/main.go
 ├── internal/
 │   ├── auth/
-│   ├── organization/
+│   │   ├── application/     # auth_application.go (routing & HTTP handlers)
+│   │   └── service/         # service.go, login_service.go, register_tenant_service.go
 │   ├── branch/
-│   ├── customer/
+│   │   ├── application/     # branch_application.go
+│   │   └── service/         # service.go, settings_service.go, hours_service.go, counter_service.go
 │   ├── service/
+│   │   ├── application/     # service_application.go
+│   │   └── service/         # service.go, read_service.go, create_service.go
 │   ├── staff/
+│   │   ├── application/     # staff_application.go
+│   │   └── service/         # service.go, read_staff_service.go, staff_profile_service.go, staff_schedule_service.go
 │   ├── appointment/
+│   │   ├── application/     # appointment_application.go
+│   │   └── service/         # service.go, availability_service.go, booking_service.go
 │   ├── queue/
-│   ├── notification/
-│   ├── analytics/
-│   ├── subscription/
-│   ├── realtime/
+│   │   ├── application/
+│   │   └── service/
+│   ├── repository/
+│   │   └── payload/         # auth_payload.go, branch_payload.go, staff_payload.go, etc.
 │   └── platform/
-│       ├── database/      # pool pgx, WithTx, konteks tenant RLS
-│       ├── cache/
-│       ├── outbox/
-│       ├── idempotency/
-│       ├── audit/
-│       ├── logger/
-│       └── middleware/
-├── api/openapi.yaml
-├── migrations/
-├── sql/                   # query sqlc per modul
-├── configs/
+│       ├── database/        # tx.go, WithTx, repository (sqlc)
+│       ├── cache/           # redis.go
+│       ├── idempotency/     # idempotency.go
+│       ├── security/        # password.go
+│       ├── token/           # jwt.go
+│       └── middleware/      # auth.go, tenant.go
+├── migrations/              # 28 file migrasi modular per tabel
+├── sql/queries/             # kueri sqlc terpisah per domain
 ├── Dockerfile
 └── go.mod
 ```

@@ -1,4 +1,4 @@
-package branch
+package application
 
 import (
 	"context"
@@ -10,30 +10,34 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 	"github.com/google/uuid"
 
+	"github.com/FatahRozaq/quevia/backend/internal/branch/service"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
 )
 
-type Handler struct {
-	service *Service
+type BranchApplication struct {
+	svc *service.BranchService
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewBranchApplication(svc *service.BranchService) *BranchApplication {
+	return &BranchApplication{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(r *route.RouterGroup, authMw app.HandlerFunc) {
+func AddRouteBranch(r *route.RouterGroup, svc *service.BranchService, authMw app.HandlerFunc) {
+	appHandler := NewBranchApplication(svc)
+
 	branches := r.Group("/branches", authMw)
-	branches.GET("/:guid/settings", h.GetSettings)
-	branches.PUT("/:guid/settings", h.UpdateSettings)
-	branches.GET("/:guid/business-hours", h.GetBusinessHours)
-	branches.PUT("/:guid/business-hours", h.SetBusinessHours)
+	branches.GET("/:guid/settings", appHandler.GetSettings)
+	branches.PUT("/:guid/settings", appHandler.UpdateSettings)
+	branches.GET("/:guid/business-hours", appHandler.GetBusinessHours)
+	branches.PUT("/:guid/business-hours", appHandler.SetBusinessHours)
 
 	counters := r.Group("/counters", authMw)
-	counters.GET("", h.ListCounters)
-	counters.POST("", h.CreateCounter)
+	counters.GET("", appHandler.ListCounters)
+	counters.POST("", appHandler.CreateCounter)
 }
 
-func (h *Handler) GetSettings(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) GetSettings(ctx context.Context, c *app.RequestContext) {
 	tenantID := middleware.GetTenantID(c)
 	if tenantID == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -46,7 +50,7 @@ func (h *Handler) GetSettings(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	res, err := h.service.GetSettings(ctx, *tenantID, branchGUID)
+	res, err := h.svc.GetSettings(ctx, *tenantID, branchGUID)
 	if err != nil {
 		c.JSON(consts.StatusNotFound, utils.H{"error": utils.H{"code": "BRANCH_NOT_FOUND"}})
 		return
@@ -55,7 +59,7 @@ func (h *Handler) GetSettings(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-func (h *Handler) UpdateSettings(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) UpdateSettings(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -68,13 +72,13 @@ func (h *Handler) UpdateSettings(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	var req SettingsInput
+	var req payload.BranchSettingsPayload
 	if err := c.BindAndValidate(&req); err != nil {
 		c.JSON(consts.StatusBadRequest, utils.H{"error": utils.H{"code": "VALIDATION_ERROR"}})
 		return
 	}
 
-	res, err := h.service.UpsertSettings(ctx, claims.TenantID, 1, branchGUID, req)
+	res, err := h.svc.UpsertSettings(ctx, claims.TenantID, 1, branchGUID, req)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -83,7 +87,7 @@ func (h *Handler) UpdateSettings(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-func (h *Handler) GetBusinessHours(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) GetBusinessHours(ctx context.Context, c *app.RequestContext) {
 	tenantID := middleware.GetTenantID(c)
 	if tenantID == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -96,7 +100,7 @@ func (h *Handler) GetBusinessHours(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	res, err := h.service.ListBusinessHours(ctx, *tenantID, branchGUID)
+	res, err := h.svc.ListBusinessHours(ctx, *tenantID, branchGUID)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -105,7 +109,7 @@ func (h *Handler) GetBusinessHours(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-func (h *Handler) SetBusinessHours(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) SetBusinessHours(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -118,13 +122,13 @@ func (h *Handler) SetBusinessHours(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	var req []BusinessHourInput
+	var req []payload.BusinessHourPayload
 	if err := c.BindAndValidate(&req); err != nil {
 		c.JSON(consts.StatusBadRequest, utils.H{"error": utils.H{"code": "VALIDATION_ERROR"}})
 		return
 	}
 
-	if err := h.service.SetBusinessHours(ctx, claims.TenantID, 1, branchGUID, req); err != nil {
+	if err := h.svc.SetBusinessHours(ctx, claims.TenantID, 1, branchGUID, req); err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR", "message": err.Error()}})
 		return
 	}
@@ -132,7 +136,7 @@ func (h *Handler) SetBusinessHours(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"message": "business hours updated successfully"})
 }
 
-func (h *Handler) ListCounters(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) ListCounters(ctx context.Context, c *app.RequestContext) {
 	tenantID := middleware.GetTenantID(c)
 	if tenantID == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -146,7 +150,7 @@ func (h *Handler) ListCounters(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	res, err := h.service.ListCounters(ctx, *tenantID, branchGUID)
+	res, err := h.svc.ListCounters(ctx, *tenantID, branchGUID)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -155,27 +159,20 @@ func (h *Handler) ListCounters(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-type CreateCounterRequest struct {
-	BranchGUID   uuid.UUID `json:"branch_guid"`
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	DisplayOrder int16     `json:"display_order"`
-}
-
-func (h *Handler) CreateCounter(ctx context.Context, c *app.RequestContext) {
+func (h *BranchApplication) CreateCounter(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
 		return
 	}
 
-	var req CreateCounterRequest
+	var req payload.CreateCounterPayload
 	if err := c.BindAndValidate(&req); err != nil || req.Code == "" || req.Name == "" {
 		c.JSON(consts.StatusBadRequest, utils.H{"error": utils.H{"code": "VALIDATION_ERROR"}})
 		return
 	}
 
-	res, err := h.service.CreateCounter(ctx, claims.TenantID, 1, req.BranchGUID, req.Code, req.Name, req.DisplayOrder)
+	res, err := h.svc.CreateCounter(ctx, claims.TenantID, 1, req)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return

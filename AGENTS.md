@@ -65,6 +65,12 @@ Ketika mengerjakan backend (`backend/`), migrasi/kueri SQL (`migrations/`, `sql/
 - **Struktur Migrasi & Kueri Modular Wajib**:
   - File migrasi database (`migrations/`) **WAJIB modular: 1 file migrasi per tabel/ekstensi/fungsi** (`.up.sql` dan `.down.sql`). Dilarang keras menggabungkan banyak tabel dalam satu file migrasi.
   - File kueri SQL (`sql/queries/`) **WAJIB modular per domain/tabel** (contoh: `users.sql`, `tenants.sql`, `branches.sql`, `appointments.sql`, `queue.sql`).
+- **Struktur Folder Modul Backend Wajib**:
+  - Setiap modul di `backend/internal/<modul>/` **WAJIB memiliki minimal 2 sub-folder**:
+    1. `application/`: Berisi `<modul>_application.go` (routing HTTP, handler, binding/validasi, delegasi ke service).
+    2. `service/`: Berisi `service.go` (definisi struct & dependencies) serta file use-case terpisah (misal `read_<modul>_service.go`, `create_<modul>_service.go`, dll.).
+  - Seluruh Request / Response DTOs **WAJIB dipisahkan di `backend/internal/repository/payload/<modul>_payload.go`**.
+
 
 1. **`sql-optimization`**:
    - Wajib membuat indeks tertarget (composite, partial unique index `WHERE deleted_at IS NULL`, GiST).

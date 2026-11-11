@@ -11,51 +11,57 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
-	"github.com/FatahRozaq/quevia/backend/internal/appointment"
-	"github.com/FatahRozaq/quevia/backend/internal/auth"
-	"github.com/FatahRozaq/quevia/backend/internal/branch"
+	appointmentApp "github.com/FatahRozaq/quevia/backend/internal/appointment/application"
+	appointmentSvc "github.com/FatahRozaq/quevia/backend/internal/appointment/service"
+	authApp "github.com/FatahRozaq/quevia/backend/internal/auth/application"
+	authSvc "github.com/FatahRozaq/quevia/backend/internal/auth/service"
+	branchApp "github.com/FatahRozaq/quevia/backend/internal/branch/application"
+	branchSvc "github.com/FatahRozaq/quevia/backend/internal/branch/service"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/idempotency"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
-	"github.com/FatahRozaq/quevia/backend/internal/service"
-	"github.com/FatahRozaq/quevia/backend/internal/staff"
+	serviceApp "github.com/FatahRozaq/quevia/backend/internal/service/application"
+	serviceSvc "github.com/FatahRozaq/quevia/backend/internal/service/service"
+	staffApp "github.com/FatahRozaq/quevia/backend/internal/staff/application"
+	staffSvc "github.com/FatahRozaq/quevia/backend/internal/staff/service"
 )
 
-type AppHandlers struct {
-	Auth        *auth.Handler
-	Branch      *branch.Handler
-	Service     *service.Handler
-	Staff       *staff.Handler
-	Appointment *appointment.Handler
+type AppServices struct {
+	Auth        *authSvc.AuthService
+	Branch      *branchSvc.BranchService
+	Service     *serviceSvc.CatalogService
+	Staff       *staffSvc.StaffService
+	Appointment *appointmentSvc.AppointmentService
+	Idempotency *idempotency.Manager
 }
 
 func registerRoutes(
 	h *server.Hertz,
-	handlers *AppHandlers,
+	services *AppServices,
 	authMw app.HandlerFunc,
 ) {
 	h.GET("/healthz", func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(consts.StatusOK, utils.H{"status": "ok", "service": "quevia-api"})
 	})
 
-	if handlers != nil {
+	if services != nil {
 		v1 := h.Group("/api/v1")
-		if handlers.Auth != nil {
-			handlers.Auth.RegisterRoutes(v1, authMw)
+		if services.Auth != nil {
+			authApp.AddRouteAuth(v1, services.Auth, authMw)
 		}
-		if handlers.Branch != nil {
-			handlers.Branch.RegisterRoutes(v1, authMw)
+		if services.Branch != nil {
+			branchApp.AddRouteBranch(v1, services.Branch, authMw)
 		}
-		if handlers.Service != nil {
-			handlers.Service.RegisterRoutes(v1, authMw)
+		if services.Service != nil {
+			serviceApp.AddRouteService(v1, services.Service, authMw)
 		}
-		if handlers.Staff != nil {
-			handlers.Staff.RegisterRoutes(v1, authMw)
+		if services.Staff != nil {
+			staffApp.AddRouteStaff(v1, services.Staff, authMw)
 		}
-		if handlers.Appointment != nil {
-			handlers.Appointment.RegisterRoutes(v1, authMw)
+		if services.Appointment != nil {
+			appointmentApp.AddRouteAppointment(v1, services.Appointment, services.Idempotency, authMw)
 		}
 	}
 }
@@ -74,7 +80,7 @@ func main() {
 	tokenManager := token.NewTokenManager(jwtKey, 15*time.Minute)
 	authMw := middleware.AuthMiddleware(tokenManager)
 
-	var handlers *AppHandlers
+	var services *AppServices
 	dbURL := os.Getenv("DATABASE_URL")
 	redisURL := os.Getenv("REDIS_URL")
 
@@ -93,22 +99,17 @@ func main() {
 
 		idempotencyMgr := idempotency.NewManager(pool, 24*time.Hour)
 
-		authSvc := auth.NewService(pool, sessionStore, tokenManager, 14*24*time.Hour)
-		branchSvc := branch.NewService(pool)
-		serviceSvc := service.NewService(pool)
-		staffSvc := staff.NewService(pool)
-		aptSvc := appointment.NewService(pool)
-
-		handlers = &AppHandlers{
-			Auth:        auth.NewHandler(authSvc),
-			Branch:      branch.NewHandler(branchSvc),
-			Service:     service.NewHandler(serviceSvc),
-			Staff:       staff.NewHandler(staffSvc),
-			Appointment: appointment.NewHandler(aptSvc, idempotencyMgr),
+		services = &AppServices{
+			Auth:        authSvc.NewAuthService(pool, sessionStore, tokenManager, 14*24*time.Hour),
+			Branch:      branchSvc.NewBranchService(pool),
+			Service:     serviceSvc.NewCatalogService(pool),
+			Staff:       staffSvc.NewStaffService(pool),
+			Appointment: appointmentSvc.NewAppointmentService(pool),
+			Idempotency: idempotencyMgr,
 		}
 	}
 
 	h := server.Default(server.WithHostPorts(":" + port))
-	registerRoutes(h, handlers, authMw)
+	registerRoutes(h, services, authMw)
 	h.Spin()
 }

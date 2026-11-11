@@ -1,4 +1,4 @@
-package service
+package application
 
 import (
 	"context"
@@ -11,34 +11,38 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/service/service"
 )
 
-type Handler struct {
-	service *Service
+type ServiceApplication struct {
+	svc *service.CatalogService
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewServiceApplication(svc *service.CatalogService) *ServiceApplication {
+	return &ServiceApplication{svc: svc}
 }
 
-func (h *Handler) RegisterRoutes(r *route.RouterGroup, authMw app.HandlerFunc) {
+func AddRouteService(r *route.RouterGroup, svc *service.CatalogService, authMw app.HandlerFunc) {
+	appHandler := NewServiceApplication(svc)
+
 	categories := r.Group("/service-categories", authMw)
-	categories.GET("", h.ListCategories)
-	categories.POST("", h.CreateCategory)
+	categories.GET("", appHandler.ListCategories)
+	categories.POST("", appHandler.CreateCategory)
 
 	services := r.Group("/services", authMw)
-	services.GET("", h.ListServices)
-	services.POST("", h.CreateService)
+	services.GET("", appHandler.ListServices)
+	services.POST("", appHandler.CreateService)
 }
 
-func (h *Handler) ListCategories(ctx context.Context, c *app.RequestContext) {
+func (h *ServiceApplication) ListCategories(ctx context.Context, c *app.RequestContext) {
 	tenantID := middleware.GetTenantID(c)
 	if tenantID == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
 		return
 	}
 
-	res, err := h.service.ListCategories(ctx, *tenantID)
+	res, err := h.svc.ListCategories(ctx, *tenantID)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -47,25 +51,20 @@ func (h *Handler) ListCategories(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-type CreateCategoryRequest struct {
-	Name      string `json:"name"`
-	SortOrder int16  `json:"sort_order"`
-}
-
-func (h *Handler) CreateCategory(ctx context.Context, c *app.RequestContext) {
+func (h *ServiceApplication) CreateCategory(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
 		return
 	}
 
-	var req CreateCategoryRequest
+	var req payload.CreateCategoryPayload
 	if err := c.BindAndValidate(&req); err != nil || req.Name == "" {
 		c.JSON(consts.StatusBadRequest, utils.H{"error": utils.H{"code": "VALIDATION_ERROR"}})
 		return
 	}
 
-	res, err := h.service.CreateCategory(ctx, claims.TenantID, 1, req.Name, req.SortOrder)
+	res, err := h.svc.CreateCategory(ctx, claims.TenantID, 1, req)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -74,7 +73,7 @@ func (h *Handler) CreateCategory(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusCreated, utils.H{"data": res})
 }
 
-func (h *Handler) ListServices(ctx context.Context, c *app.RequestContext) {
+func (h *ServiceApplication) ListServices(ctx context.Context, c *app.RequestContext) {
 	tenantID := middleware.GetTenantID(c)
 	if tenantID == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
@@ -88,7 +87,7 @@ func (h *Handler) ListServices(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	res, err := h.service.ListServices(ctx, *tenantID, branchGUID)
+	res, err := h.svc.ListServices(ctx, *tenantID, branchGUID)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return
@@ -97,20 +96,20 @@ func (h *Handler) ListServices(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{"data": res})
 }
 
-func (h *Handler) CreateService(ctx context.Context, c *app.RequestContext) {
+func (h *ServiceApplication) CreateService(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{"error": utils.H{"code": "UNAUTHORIZED"}})
 		return
 	}
 
-	var req CreateServiceInput
+	var req payload.CreateServicePayload
 	if err := c.BindAndValidate(&req); err != nil || req.Name == "" || req.QueuePrefix == "" || req.DurationMinutes <= 0 {
 		c.JSON(consts.StatusBadRequest, utils.H{"error": utils.H{"code": "VALIDATION_ERROR"}})
 		return
 	}
 
-	res, err := h.service.CreateService(ctx, claims.TenantID, 1, req)
+	res, err := h.svc.CreateService(ctx, claims.TenantID, 1, req)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, utils.H{"error": utils.H{"code": "INTERNAL_ERROR"}})
 		return

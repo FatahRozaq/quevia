@@ -1,65 +1,62 @@
-package auth
+package application
 
 import (
 	"context"
 	"errors"
 	"net/http"
 	"strings"
+
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
+
+	"github.com/FatahRozaq/quevia/backend/internal/auth/service"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
 )
 
-type Handler struct {
-	service *Service
+type AuthApplication struct {
+	svc *service.AuthService
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewAuthApplication(svc *service.AuthService) *AuthApplication {
+	return &AuthApplication{svc: svc}
 }
 
-// RegisterRoutes registers auth endpoints to Hertz router.
-func (h *Handler) RegisterRoutes(r *route.RouterGroup, authMw app.HandlerFunc) {
-	r.POST("/tenants", h.RegisterTenant)
-	r.POST("/auth/login", h.Login)
-	r.GET("/me", authMw, h.Me)
+func AddRouteAuth(r *route.RouterGroup, svc *service.AuthService, authMw app.HandlerFunc) {
+	appHandler := NewAuthApplication(svc)
+	r.POST("/tenants", appHandler.RegisterTenant)
+	r.POST("/auth/login", appHandler.Login)
+	r.GET("/me", authMw, appHandler.Me)
 }
 
-// RegisterTenant handles tenant registration request.
-func (h *Handler) RegisterTenant(ctx context.Context, c *app.RequestContext) {
-	var req RegisterTenantInput
+func (h *AuthApplication) RegisterTenant(ctx context.Context, c *app.RequestContext) {
+	var req payload.RegisterTenantPayload
 	if err := c.BindAndValidate(&req); err != nil {
 		c.JSON(consts.StatusBadRequest, utils.H{
-			"error": utils.H{
-				"code":    "VALIDATION_ERROR",
-				"message": "Invalid request payload",
-			},
+			"error": utils.H{"code": "VALIDATION_ERROR", "message": "Invalid request payload"},
 		})
 		return
 	}
 
 	if req.TenantName == "" || req.TenantSlug == "" || req.AdminEmail == "" || req.AdminPassword == "" || req.BranchCode == "" || req.BranchName == "" {
 		c.JSON(consts.StatusBadRequest, utils.H{
-			"error": utils.H{
-				"code":    "VALIDATION_ERROR",
-				"message": "All required fields must be provided",
-			},
+			"error": utils.H{"code": "VALIDATION_ERROR", "message": "All required fields must be provided"},
 		})
 		return
 	}
 
-	result, err := h.service.RegisterTenant(ctx, req)
+	result, err := h.svc.RegisterTenant(ctx, req)
 	if err != nil {
-		if errors.Is(err, ErrTenantSlugExists) {
+		if errors.Is(err, service.ErrTenantSlugExists) {
 			c.JSON(consts.StatusConflict, utils.H{
 				"error": utils.H{"code": "SLUG_ALREADY_EXISTS", "message": "Tenant slug already taken"},
 			})
 			return
 		}
-		if errors.Is(err, ErrUserEmailExists) {
+		if errors.Is(err, service.ErrUserEmailExists) {
 			c.JSON(consts.StatusConflict, utils.H{
 				"error": utils.H{"code": "EMAIL_ALREADY_EXISTS", "message": "Admin email already registered"},
 			})
@@ -76,14 +73,8 @@ func (h *Handler) RegisterTenant(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-// Login authenticates user and sets refresh token in httpOnly cookie.
-func (h *Handler) Login(ctx context.Context, c *app.RequestContext) {
-	var req LoginRequest
+func (h *AuthApplication) Login(ctx context.Context, c *app.RequestContext) {
+	var req payload.LoginPayload
 	if err := c.BindAndValidate(&req); err != nil || strings.TrimSpace(req.Email) == "" || req.Password == "" {
 		c.JSON(consts.StatusBadRequest, utils.H{
 			"error": utils.H{"code": "VALIDATION_ERROR", "message": "Email and password are required"},
@@ -91,9 +82,9 @@ func (h *Handler) Login(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	result, err := h.service.Login(ctx, req.Email, req.Password)
+	result, err := h.svc.Login(ctx, req)
 	if err != nil {
-		if errors.Is(err, ErrInvalidCredentials) || errors.Is(err, ErrNoActiveMembership) {
+		if errors.Is(err, service.ErrInvalidCredentials) || errors.Is(err, service.ErrNoActiveMembership) {
 			c.JSON(consts.StatusUnauthorized, utils.H{
 				"error": utils.H{"code": "INVALID_CREDENTIALS", "message": "Invalid email or password"},
 			})
@@ -105,7 +96,6 @@ func (h *Handler) Login(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// Set refresh token in httpOnly cookie
 	cookie := protocol.AcquireCookie()
 	cookie.SetKey("refresh_token")
 	cookie.SetValue(result.RefreshToken)
@@ -119,21 +109,12 @@ func (h *Handler) Login(ctx context.Context, c *app.RequestContext) {
 	c.JSON(consts.StatusOK, utils.H{
 		"data": utils.H{
 			"access_token": result.AccessToken,
-			"user": utils.H{
-				"guid":        result.UserGUID,
-				"full_name":   result.FullName,
-				"email":       result.Email,
-				"tenant_guid": result.TenantGUID,
-				"tenant_slug": result.TenantSlug,
-				"branch_guid": result.BranchGUID,
-				"role":        result.Role,
-			},
+			"user":         result.User,
 		},
 	})
 }
 
-// Me returns the authenticated user's claims from the token context.
-func (h *Handler) Me(ctx context.Context, c *app.RequestContext) {
+func (h *AuthApplication) Me(ctx context.Context, c *app.RequestContext) {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
 		c.JSON(consts.StatusUnauthorized, utils.H{

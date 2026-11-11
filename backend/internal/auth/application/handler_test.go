@@ -1,10 +1,13 @@
-package auth
+package application
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/test/assert"
@@ -12,25 +15,50 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/google/uuid"
 
+	"github.com/FatahRozaq/quevia/backend/internal/auth/service"
+	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
+	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/middleware"
+	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
 )
 
 func TestAuthEndpointsHTTP(t *testing.T) {
-	svc, pool := getTestDBAndRedis(t)
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://quevia_app:quevia_app_password@127.0.0.1:5432/db-quevia?sslmode=disable"
+	}
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://localhost:6379/0"
+	}
+
+	ctx := context.Background()
+	pool, err := database.NewPool(ctx, dbURL)
+	if err != nil {
+		t.Skipf("skipping test: db not available: %v", err)
+	}
 	defer pool.Close()
 
-	handler := NewHandler(svc)
+	sessionStore, err := cache.NewSessionStore(redisURL)
+	if err != nil {
+		t.Skipf("skipping test: redis not available: %v", err)
+	}
+
+	tokenManager := token.NewTokenManager("test-super-secret-key-at-least-32-chars!", 15*time.Minute)
+	svc := service.NewAuthService(pool, sessionStore, tokenManager, 14*24*time.Hour)
+
 	h := server.Default()
 	v1 := h.Group("/api/v1")
-	authMw := middleware.AuthMiddleware(svc.tokenManager)
-	handler.RegisterRoutes(v1, authMw)
+	authMw := middleware.AuthMiddleware(tokenManager)
+	AddRouteAuth(v1, svc, authMw)
 
 	slug := "http-biz-" + uuid.NewString()[:8]
 	email := "admin-" + uuid.NewString()[:8] + "@http.com"
 	password := "SecureP@ss123!"
 
 	// 1. POST /api/v1/tenants
-	regBody, _ := json.Marshal(RegisterTenantInput{
+	regBody, _ := json.Marshal(payload.RegisterTenantPayload{
 		TenantName:    "Bengkel Auto HTTP",
 		TenantSlug:    slug,
 		BusinessType:  "WORKSHOP",
@@ -49,7 +77,7 @@ func TestAuthEndpointsHTTP(t *testing.T) {
 	assert.DeepEqual(t, consts.StatusCreated, wReg.Result().StatusCode())
 
 	// 2. POST /api/v1/auth/login
-	loginBody, _ := json.Marshal(LoginRequest{
+	loginBody, _ := json.Marshal(payload.LoginPayload{
 		Email:    email,
 		Password: password,
 	})

@@ -83,10 +83,16 @@ quevia/
 │   ├── cmd/
 │   │   ├── api/main.go            # HTTP & WebSocket Gateway Server
 │   │   └── worker/main.go         # River Worker & Outbox Relay
-│   ├── internal/                  # Domain modules (auth, appointment, queue, etc.)
-│   ├── api/openapi.yaml           # REST API Contract (OpenAPI 3.0)
-│   ├── migrations/                # Database Migrations (26 tables)
-│   └── sql/                       # sqlc queries & schema
+│   ├── internal/                  # Domain modules: application/ + service/
+│   │   ├── auth/                  # application/ (routing/handlers) + service/
+│   │   ├── branch/                # application/ + service/
+│   │   ├── service/               # application/ + service/
+│   │   ├── staff/                 # application/ + service/
+│   │   ├── appointment/           # application/ + service/
+│   │   ├── repository/payload/    # DTOs & request validation
+│   │   └── platform/              # database (WithTx), cache (redis), security
+│   ├── migrations/                # Database Migrations (28 modular files)
+│   └── sql/queries/               # sqlc queries per domain
 │
 ├── frontend/                      # Next.js App Router (TypeScript)
 │   ├── app/                       # Route groups: (public), (customer), (dashboard), (operator), display
