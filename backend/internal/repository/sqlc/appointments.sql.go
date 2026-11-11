@@ -3,7 +3,7 @@
 //   sqlc v1.31.1
 // source: appointments.sql
 
-package repository
+package sqlc
 
 import (
 	"context"

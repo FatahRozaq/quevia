@@ -18,10 +18,10 @@ import (
 	branchSvc "github.com/FatahRozaq/quevia/backend/internal/branch/service"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/idempotency"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 	serviceSvc "github.com/FatahRozaq/quevia/backend/internal/service/service"
 	staffSvc "github.com/FatahRozaq/quevia/backend/internal/staff/service"
 )
@@ -91,7 +91,7 @@ func setupTenantBranchServiceStaff(
 	}
 
 	var tenantID, userID int64
-	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *repository.Queries) error {
+	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *sqlc.Queries) error {
 		tRow, _ := q.GetTenantBySlug(ctx, slug)
 		tenantID = tRow.ID
 		uRow, _ := q.GetUserByEmail(ctx, email)
@@ -234,7 +234,7 @@ func TestConcurrency50GoroutinesAntiDoubleBooking(t *testing.T) {
 	}
 
 	var dbCount int64
-	_ = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	_ = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		row := tx.QueryRow(ctx, "SELECT count(*) FROM appointments WHERE branch_id = (SELECT id FROM branches WHERE guid = $1) AND start_at = $2 AND status = 'CONFIRMED'", branchGUID, targetSlot)
 		return row.Scan(&dbCount)
 	})

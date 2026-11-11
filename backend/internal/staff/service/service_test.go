@@ -15,9 +15,9 @@ import (
 	branchSvc "github.com/FatahRozaq/quevia/backend/internal/branch/service"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 	serviceSvc "github.com/FatahRozaq/quevia/backend/internal/service/service"
 )
 
@@ -75,7 +75,7 @@ func createTenantAndBranch(t *testing.T, ctx context.Context, authService *authS
 	}
 
 	var tenantID, userID int64
-	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *repository.Queries) error {
+	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *sqlc.Queries) error {
 		tRow, _ := q.GetTenantBySlug(ctx, slug)
 		tenantID = tRow.ID
 		uRow, _ := q.GetUserByEmail(ctx, email)
@@ -183,8 +183,8 @@ func TestStaffServiceAssociation(t *testing.T) {
 	}
 
 	// Verify staff services in repository
-	var staffSvcRows []repository.ListStaffServicesRow
-	err = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	var staffSvcRows []sqlc.ListStaffServicesRow
+	err = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		rows, err := q.ListStaffServices(ctx, staff.ID)
 		if err != nil {
 			return err
@@ -242,8 +242,8 @@ func TestStaffDeactivationEnforcesActiveAppointmentsRule(t *testing.T) {
 	})
 
 	var appointmentID int64
-	err = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
-		cust, err := q.CreateCustomer(ctx, repository.CreateCustomerParams{
+	err = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
+		cust, err := q.CreateCustomer(ctx, sqlc.CreateCustomerParams{
 			Guid:      pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:  tenantID,
 			UserID:    pgtype.Int8{Valid: false},
@@ -258,7 +258,7 @@ func TestStaffDeactivationEnforcesActiveAppointmentsRule(t *testing.T) {
 
 		aptStart := time.Now().Add(24 * time.Hour)
 		aptEnd := aptStart.Add(1 * time.Hour)
-		apt, err := q.CreateAppointment(ctx, repository.CreateAppointmentParams{
+		apt, err := q.CreateAppointment(ctx, sqlc.CreateAppointmentParams{
 			Guid:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:    tenantID,
 			BranchID:    staff.BranchID,
@@ -304,7 +304,7 @@ func TestStaffDeactivationEnforcesActiveAppointmentsRule(t *testing.T) {
 	}
 
 	// 6. Cancel the appointment
-	_ = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	_ = database.WithTx(ctx, pool, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		_, err := tx.Exec(ctx, "UPDATE appointments SET status = 'CANCELLED' WHERE id = $1", appointmentID)
 		return err
 	})

@@ -8,12 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *StaffService) ListStaff(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]repository.ListStaffByBranchRow, error) {
-	var rows []repository.ListStaffByBranchRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *StaffService) ListStaff(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]sqlc.ListStaffByBranchRow, error) {
+	var rows []sqlc.ListStaffByBranchRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound

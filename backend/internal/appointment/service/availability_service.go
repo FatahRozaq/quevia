@@ -11,14 +11,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *AppointmentService) CalculateAvailability(ctx context.Context, tenantID int64, branchGUID, serviceGUID uuid.UUID, dateStr string, staffGUID *uuid.UUID) (*payload.AvailabilityResponse, error) {
 	var result *payload.AvailabilityResponse
 
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -79,19 +79,19 @@ func (s *AppointmentService) CalculateAvailability(ctx context.Context, tenantID
 		}
 
 		// 3. Find eligible staff members
-		var eligibleStaff []repository.ListStaffByBranchAndServiceRow
+		var eligibleStaff []sqlc.ListStaffByBranchAndServiceRow
 		if staffGUID != nil {
 			sp, err := q.GetStaffProfileByGUID(ctx, pgtype.UUID{Bytes: *staffGUID, Valid: true})
 			if err != nil || sp.Status != "ACTIVE" {
 				return ErrStaffNotEligible
 			}
-			eligibleStaff = append(eligibleStaff, repository.ListStaffByBranchAndServiceRow{
+			eligibleStaff = append(eligibleStaff, sqlc.ListStaffByBranchAndServiceRow{
 				ID:          sp.ID,
 				Guid:        sp.Guid,
 				DisplayName: sp.DisplayName,
 			})
 		} else {
-			eligibleStaff, err = q.ListStaffByBranchAndService(ctx, repository.ListStaffByBranchAndServiceParams{
+			eligibleStaff, err = q.ListStaffByBranchAndService(ctx, sqlc.ListStaffByBranchAndServiceParams{
 				BranchID:  branch.ID,
 				ServiceID: svc.ID,
 			})
@@ -111,7 +111,7 @@ func (s *AppointmentService) CalculateAvailability(ctx context.Context, tenantID
 
 		// 4. For each staff member, evaluate availability
 		for _, st := range eligibleStaff {
-			sched, err := q.GetStaffScheduleForDay(ctx, repository.GetStaffScheduleForDayParams{
+			sched, err := q.GetStaffScheduleForDay(ctx, sqlc.GetStaffScheduleForDayParams{
 				StaffID:   st.ID,
 				DayOfWeek: dayOfWeek,
 			})
@@ -119,7 +119,7 @@ func (s *AppointmentService) CalculateAvailability(ctx context.Context, tenantID
 				continue
 			}
 
-			exceptions, err := q.GetScheduleExceptionsForStaffAndDate(ctx, repository.GetScheduleExceptionsForStaffAndDateParams{
+			exceptions, err := q.GetScheduleExceptionsForStaffAndDate(ctx, sqlc.GetScheduleExceptionsForStaffAndDateParams{
 				BranchID:  branch.ID,
 				StaffID:   pgtype.Int8{Int64: st.ID, Valid: true},
 				StartDate: pgtype.Date{Time: targetDate, Valid: true},
@@ -137,7 +137,7 @@ func (s *AppointmentService) CalculateAvailability(ctx context.Context, tenantID
 				}
 			}
 
-			existingApts, err := q.ListStaffAppointmentsForDateRange(ctx, repository.ListStaffAppointmentsForDateRangeParams{
+			existingApts, err := q.ListStaffAppointmentsForDateRange(ctx, sqlc.ListStaffAppointmentsForDateRangeParams{
 				StaffID: st.ID,
 				StartAt: pgtype.Timestamptz{Time: dayStart, Valid: true},
 				EndAt:   pgtype.Timestamptz{Time: dayEnd, Valid: true},

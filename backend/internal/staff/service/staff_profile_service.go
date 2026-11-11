@@ -10,13 +10,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *StaffService) CreateStaff(ctx context.Context, tenantID int64, creatorID int64, input payload.CreateStaffPayload) (*repository.CreateStaffProfileRow, error) {
-	var row *repository.CreateStaffProfileRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *StaffService) CreateStaff(ctx context.Context, tenantID int64, creatorID int64, input payload.CreateStaffPayload) (*sqlc.CreateStaffProfileRow, error) {
+	var row *sqlc.CreateStaffProfileRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: input.BranchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -27,7 +27,7 @@ func (s *StaffService) CreateStaff(ctx context.Context, tenantID int64, creatorI
 			return ErrUserNotFound
 		}
 
-		res, err := q.CreateStaffProfile(ctx, repository.CreateStaffProfileParams{
+		res, err := q.CreateStaffProfile(ctx, sqlc.CreateStaffProfileParams{
 			Guid:           pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:       tenantID,
 			BranchID:       branch.ID,
@@ -49,13 +49,13 @@ func (s *StaffService) CreateStaff(ctx context.Context, tenantID int64, creatorI
 	return row, nil
 }
 
-func (s *StaffService) UpdateStaffStatus(ctx context.Context, tenantID int64, updaterID int64, staffGUID uuid.UUID, newStatus string) (*repository.UpdateStaffProfileStatusRow, error) {
+func (s *StaffService) UpdateStaffStatus(ctx context.Context, tenantID int64, updaterID int64, staffGUID uuid.UUID, newStatus string) (*sqlc.UpdateStaffProfileStatusRow, error) {
 	if newStatus != "ACTIVE" && newStatus != "INACTIVE" {
 		return nil, ErrInvalidStatus
 	}
 
-	var row *repository.UpdateStaffProfileStatusRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	var row *sqlc.UpdateStaffProfileStatusRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		staff, err := q.GetStaffProfileByGUID(ctx, pgtype.UUID{Bytes: staffGUID, Valid: true})
 		if err != nil {
 			return ErrStaffNotFound
@@ -63,7 +63,7 @@ func (s *StaffService) UpdateStaffStatus(ctx context.Context, tenantID int64, up
 
 		// Enforce FR-SVC-06 & BR-19: If deactivating, check active upcoming appointments
 		if newStatus == "INACTIVE" {
-			count, err := q.CountActiveUpcomingAppointmentsByStaff(ctx, repository.CountActiveUpcomingAppointmentsByStaffParams{
+			count, err := q.CountActiveUpcomingAppointmentsByStaff(ctx, sqlc.CountActiveUpcomingAppointmentsByStaffParams{
 				StaffID: staff.ID,
 				EndAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			})
@@ -75,7 +75,7 @@ func (s *StaffService) UpdateStaffStatus(ctx context.Context, tenantID int64, up
 			}
 		}
 
-		res, err := q.UpdateStaffProfileStatus(ctx, repository.UpdateStaffProfileStatusParams{
+		res, err := q.UpdateStaffProfileStatus(ctx, sqlc.UpdateStaffProfileStatusParams{
 			Guid:      pgtype.UUID{Bytes: staffGUID, Valid: true},
 			Status:    newStatus,
 			UpdatedBy: pgtype.Int8{Int64: updaterID, Valid: true},
@@ -93,13 +93,13 @@ func (s *StaffService) UpdateStaffStatus(ctx context.Context, tenantID int64, up
 }
 
 func (s *StaffService) AssignServices(ctx context.Context, tenantID int64, updaterID int64, staffGUID uuid.UUID, serviceGUIDs []uuid.UUID) error {
-	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		staff, err := q.GetStaffProfileByGUID(ctx, pgtype.UUID{Bytes: staffGUID, Valid: true})
 		if err != nil {
 			return ErrStaffNotFound
 		}
 
-		if err := q.RemoveStaffServicesByStaffID(ctx, repository.RemoveStaffServicesByStaffIDParams{
+		if err := q.RemoveStaffServicesByStaffID(ctx, sqlc.RemoveStaffServicesByStaffIDParams{
 			StaffID:   staff.ID,
 			DeletedBy: pgtype.Int8{Int64: updaterID, Valid: true},
 		}); err != nil {
@@ -112,7 +112,7 @@ func (s *StaffService) AssignServices(ctx context.Context, tenantID int64, updat
 				continue
 			}
 
-			_, err = q.AssignStaffService(ctx, repository.AssignStaffServiceParams{
+			_, err = q.AssignStaffService(ctx, sqlc.AssignStaffServiceParams{
 				Guid:      pgtype.UUID{Bytes: uuid.New(), Valid: true},
 				TenantID:  tenantID,
 				StaffID:   staff.ID,

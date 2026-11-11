@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int64, userID *int64, input payload.CreateAppointmentPayload) (*payload.AppointmentResponse, error) {
@@ -27,7 +27,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 
 	var result *payload.AppointmentResponse
 
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: input.BranchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -41,14 +41,14 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 		endAt := input.StartAt.Add(time.Duration(svc.DurationMinutes) * time.Minute)
 
 		var customerID int64
-		custRow, err := q.GetCustomerByEmail(ctx, repository.GetCustomerByEmailParams{
+		custRow, err := q.GetCustomerByEmail(ctx, sqlc.GetCustomerByEmailParams{
 			TenantID: tenantID,
 			Lower:    input.Customer.Email,
 		})
 		if err == nil {
 			customerID = custRow.ID
 		} else {
-			newCust, err := q.CreateCustomer(ctx, repository.CreateCustomerParams{
+			newCust, err := q.CreateCustomer(ctx, sqlc.CreateCustomerParams{
 				Guid:      pgtype.UUID{Bytes: uuid.New(), Valid: true},
 				TenantID:  tenantID,
 				UserID:    pgtype.Int8{Valid: false},
@@ -76,7 +76,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 			staffGUID = sp.Guid.Bytes
 			staffDisplayName = sp.DisplayName
 		} else {
-			eligibleStaff, err := q.ListStaffByBranchAndService(ctx, repository.ListStaffByBranchAndServiceParams{
+			eligibleStaff, err := q.ListStaffByBranchAndService(ctx, sqlc.ListStaffByBranchAndServiceParams{
 				BranchID:  branch.ID,
 				ServiceID: svc.ID,
 			})
@@ -86,7 +86,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 
 			found := false
 			for _, st := range eligibleStaff {
-				overlaps, err := q.CheckStaffOverlap(ctx, repository.CheckStaffOverlapParams{
+				overlaps, err := q.CheckStaffOverlap(ctx, sqlc.CheckStaffOverlapParams{
 					StaffID: st.ID,
 					StartAt: pgtype.Timestamptz{Time: input.StartAt, Valid: true},
 					EndAt:   pgtype.Timestamptz{Time: endAt, Valid: true},
@@ -113,7 +113,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 			createdByID = pgtype.Int8{Int64: *userID, Valid: true}
 		}
 
-		apt, err := q.CreateAppointment(ctx, repository.CreateAppointmentParams{
+		apt, err := q.CreateAppointment(ctx, sqlc.CreateAppointmentParams{
 			Guid:        pgtype.UUID{Bytes: aptGUID, Valid: true},
 			TenantID:    tenantID,
 			BranchID:    branch.ID,
@@ -143,7 +143,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 			"start_at":     input.StartAt,
 			"end_at":       endAt,
 		})
-		_, _ = q.CreateAuditLog(ctx, repository.CreateAuditLogParams{
+		_, _ = q.CreateAuditLog(ctx, sqlc.CreateAuditLogParams{
 			Guid:       pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:   pgtype.Int8{Int64: tenantID, Valid: true},
 			BranchID:   pgtype.Int8{Int64: branch.ID, Valid: true},
@@ -161,7 +161,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 			"customer_email":   input.Customer.Email,
 			"start_at":         input.StartAt,
 		})
-		_, _ = q.CreateOutboxEvent(ctx, repository.CreateOutboxEventParams{
+		_, _ = q.CreateOutboxEvent(ctx, sqlc.CreateOutboxEventParams{
 			Guid:          pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:      tenantID,
 			AggregateType: "appointment",
@@ -197,7 +197,7 @@ func (s *AppointmentService) CreateAppointment(ctx context.Context, tenantID int
 func (s *AppointmentService) CancelAppointment(ctx context.Context, tenantID int64, userID *int64, appointmentGUID uuid.UUID, reason string) (*payload.AppointmentResponse, error) {
 	var result *payload.AppointmentResponse
 
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		apt, err := q.GetAppointmentByGUID(ctx, pgtype.UUID{Bytes: appointmentGUID, Valid: true})
 		if err != nil {
 			return ErrAppointmentNotFound
@@ -219,7 +219,7 @@ func (s *AppointmentService) CancelAppointment(ctx context.Context, tenantID int
 			updatedByID = pgtype.Int8{Int64: *userID, Valid: true}
 		}
 
-		cancelled, err := q.CancelAppointment(ctx, repository.CancelAppointmentParams{
+		cancelled, err := q.CancelAppointment(ctx, sqlc.CancelAppointmentParams{
 			Guid:         pgtype.UUID{Bytes: appointmentGUID, Valid: true},
 			CancelReason: pgtype.Text{String: reason, Valid: reason != ""},
 			UpdatedBy:    updatedByID,
@@ -246,8 +246,8 @@ func (s *AppointmentService) CancelAppointment(ctx context.Context, tenantID int
 func (s *AppointmentService) LookupBooking(ctx context.Context, tenantID int64, bookingCode, email string) (*payload.AppointmentResponse, error) {
 	var result *payload.AppointmentResponse
 
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
-		apt, err := q.GetAppointmentByBookingCodeAndEmail(ctx, repository.GetAppointmentByBookingCodeAndEmailParams{
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
+		apt, err := q.GetAppointmentByBookingCodeAndEmail(ctx, sqlc.GetAppointmentByBookingCodeAndEmailParams{
 			BookingCode: strings.TrimSpace(bookingCode),
 			Lower:       strings.ToLower(strings.TrimSpace(email)),
 		})

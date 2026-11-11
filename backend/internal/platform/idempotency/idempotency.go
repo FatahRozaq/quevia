@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 var (
@@ -69,8 +69,8 @@ func (m *Manager) Execute(
 	requestHash := ComputeHash(payload)
 
 	var cached *CachedResponse
-	err := database.WithTx(ctx, m.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
-		existing, err := q.GetIdempotencyKey(ctx, repository.GetIdempotencyKeyParams{
+	err := database.WithTx(ctx, m.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
+		existing, err := q.GetIdempotencyKey(ctx, sqlc.GetIdempotencyKeyParams{
 			TenantID: tenantID,
 			Scope:    scope,
 			Key:      key,
@@ -92,7 +92,7 @@ func (m *Manager) Execute(
 
 		// Insert IN_PROGRESS
 		expiresAt := time.Now().Add(m.ttl)
-		_, err = q.CreateIdempotencyKey(ctx, repository.CreateIdempotencyKeyParams{
+		_, err = q.CreateIdempotencyKey(ctx, sqlc.CreateIdempotencyKeyParams{
 			Guid:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:    tenantID,
 			Scope:       scope,
@@ -128,8 +128,8 @@ func (m *Manager) Execute(
 	}
 
 	// Update to COMPLETED
-	_ = database.WithTx(ctx, m.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
-		return q.CompleteIdempotencyKey(ctx, repository.CompleteIdempotencyKeyParams{
+	_ = database.WithTx(ctx, m.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
+		return q.CompleteIdempotencyKey(ctx, sqlc.CompleteIdempotencyKeyParams{
 			TenantID:       tenantID,
 			Scope:          scope,
 			Key:            key,

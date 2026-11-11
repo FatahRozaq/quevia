@@ -9,13 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *BranchService) GetSettings(ctx context.Context, tenantID int64, branchGUID uuid.UUID) (*repository.GetBranchSettingsRow, error) {
-	var row *repository.GetBranchSettingsRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *BranchService) GetSettings(ctx context.Context, tenantID int64, branchGUID uuid.UUID) (*sqlc.GetBranchSettingsRow, error) {
+	var row *sqlc.GetBranchSettingsRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -23,7 +23,7 @@ func (s *BranchService) GetSettings(ctx context.Context, tenantID int64, branchG
 
 		res, err := q.GetBranchSettings(ctx, branch.ID)
 		if err != nil {
-			res = repository.GetBranchSettingsRow{
+			res = sqlc.GetBranchSettingsRow{
 				BranchID:                 branch.ID,
 				ChangeCutoffMinutes:       180,
 				CheckInOpenBeforeMinutes: 30,
@@ -44,9 +44,9 @@ func (s *BranchService) GetSettings(ctx context.Context, tenantID int64, branchG
 	return row, nil
 }
 
-func (s *BranchService) UpsertSettings(ctx context.Context, tenantID int64, userID int64, branchGUID uuid.UUID, input payload.BranchSettingsPayload) (*repository.UpsertBranchSettingsRow, error) {
-	var row *repository.UpsertBranchSettingsRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *BranchService) UpsertSettings(ctx context.Context, tenantID int64, userID int64, branchGUID uuid.UUID, input payload.BranchSettingsPayload) (*sqlc.UpsertBranchSettingsRow, error) {
+	var row *sqlc.UpsertBranchSettingsRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -57,7 +57,7 @@ func (s *BranchService) UpsertSettings(ctx context.Context, tenantID int64, user
 			lateGrace = pgtype.Int4{Int32: *input.LateGraceMinutes, Valid: true}
 		}
 
-		res, err := q.UpsertBranchSettings(ctx, repository.UpsertBranchSettingsParams{
+		res, err := q.UpsertBranchSettings(ctx, sqlc.UpsertBranchSettingsParams{
 			Guid:                     pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:                 tenantID,
 			BranchID:                 branch.ID,

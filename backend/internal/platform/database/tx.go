@@ -7,8 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 // NewPool initializes a thread-safe connection pool for PostgreSQL.
@@ -40,7 +39,7 @@ func SetTenantContext(ctx context.Context, tx pgx.Tx, tenantID int64) error {
 }
 
 // WithTx executes a database transaction with optional tenant isolation context.
-func WithTx(ctx context.Context, pool *pgxpool.Pool, tenantID *int64, fn func(tx pgx.Tx, q *repository.Queries) error) error {
+func WithTx(ctx context.Context, pool *pgxpool.Pool, tenantID *int64, fn func(tx pgx.Tx, q *sqlc.Queries) error) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("beginning tx: %w", err)
@@ -56,7 +55,7 @@ func WithTx(ctx context.Context, pool *pgxpool.Pool, tenantID *int64, fn func(tx
 		}
 	}
 
-	q := repository.New(tx)
+	q := sqlc.New(tx)
 	if err := fn(tx, q); err != nil {
 		return err
 	}

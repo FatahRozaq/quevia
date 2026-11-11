@@ -10,14 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *CatalogService) CreateCategory(ctx context.Context, tenantID int64, userID int64, input payload.CreateCategoryPayload) (*repository.CreateServiceCategoryRow, error) {
-	var row *repository.CreateServiceCategoryRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
-		res, err := q.CreateServiceCategory(ctx, repository.CreateServiceCategoryParams{
+func (s *CatalogService) CreateCategory(ctx context.Context, tenantID int64, userID int64, input payload.CreateCategoryPayload) (*sqlc.CreateServiceCategoryRow, error) {
+	var row *sqlc.CreateServiceCategoryRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
+		res, err := q.CreateServiceCategory(ctx, sqlc.CreateServiceCategoryParams{
 			Guid:      pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:  tenantID,
 			Name:      input.Name,
@@ -36,9 +36,9 @@ func (s *CatalogService) CreateCategory(ctx context.Context, tenantID int64, use
 	return row, nil
 }
 
-func (s *CatalogService) CreateService(ctx context.Context, tenantID int64, userID int64, input payload.CreateServicePayload) (*repository.CreateServiceRow, error) {
-	var row *repository.CreateServiceRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *CatalogService) CreateService(ctx context.Context, tenantID int64, userID int64, input payload.CreateServicePayload) (*sqlc.CreateServiceRow, error) {
+	var row *sqlc.CreateServiceRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: input.BranchGUID, Valid: true})
 		if err != nil {
 			return errors.New("branch not found")
@@ -54,7 +54,7 @@ func (s *CatalogService) CreateService(ctx context.Context, tenantID int64, user
 			_ = priceNumeric.Scan(fmt.Sprintf("%.2f", *input.Price))
 		}
 
-		res, err := q.CreateService(ctx, repository.CreateServiceParams{
+		res, err := q.CreateService(ctx, sqlc.CreateServiceParams{
 			Guid:                   pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:               tenantID,
 			BranchID:               branch.ID,

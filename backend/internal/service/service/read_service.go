@@ -9,12 +9,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *CatalogService) ListCategories(ctx context.Context, tenantID int64) ([]repository.ListServiceCategoriesRow, error) {
-	var rows []repository.ListServiceCategoriesRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *CatalogService) ListCategories(ctx context.Context, tenantID int64) ([]sqlc.ListServiceCategoriesRow, error) {
+	var rows []sqlc.ListServiceCategoriesRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		res, err := q.ListServiceCategories(ctx, tenantID)
 		if err != nil {
 			return err
@@ -28,9 +28,9 @@ func (s *CatalogService) ListCategories(ctx context.Context, tenantID int64) ([]
 	return rows, nil
 }
 
-func (s *CatalogService) ListServices(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]repository.ListServicesByBranchRow, error) {
-	var rows []repository.ListServicesByBranchRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *CatalogService) ListServices(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]sqlc.ListServicesByBranchRow, error) {
+	var rows []sqlc.ListServicesByBranchRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return errors.New("branch not found")

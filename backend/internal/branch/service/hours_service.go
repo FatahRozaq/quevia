@@ -10,18 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *BranchService) SetBusinessHours(ctx context.Context, tenantID int64, userID int64, branchGUID uuid.UUID, hours []payload.BusinessHourPayload) error {
-	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
 		}
 
-		if err := q.DeleteBusinessHoursByBranch(ctx, repository.DeleteBusinessHoursByBranchParams{
+		if err := q.DeleteBusinessHoursByBranch(ctx, sqlc.DeleteBusinessHoursByBranchParams{
 			BranchID:  branch.ID,
 			DeletedBy: pgtype.Int8{Int64: userID, Valid: true},
 		}); err != nil {
@@ -47,7 +47,7 @@ func (s *BranchService) SetBusinessHours(ctx context.Context, tenantID int64, us
 			openMicro := int64(openT.Hour()*3600+openT.Minute()*60+openT.Second()) * 1000000
 			closeMicro := int64(closeT.Hour()*3600+closeT.Minute()*60+closeT.Second()) * 1000000
 
-			_, err = q.CreateBusinessHour(ctx, repository.CreateBusinessHourParams{
+			_, err = q.CreateBusinessHour(ctx, sqlc.CreateBusinessHourParams{
 				Guid:      pgtype.UUID{Bytes: uuid.New(), Valid: true},
 				TenantID:  tenantID,
 				BranchID:  branch.ID,
@@ -64,9 +64,9 @@ func (s *BranchService) SetBusinessHours(ctx context.Context, tenantID int64, us
 	})
 }
 
-func (s *BranchService) ListBusinessHours(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]repository.ListBusinessHoursByBranchRow, error) {
-	var rows []repository.ListBusinessHoursByBranchRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *BranchService) ListBusinessHours(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]sqlc.ListBusinessHoursByBranchRow, error) {
+	var rows []sqlc.ListBusinessHoursByBranchRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound

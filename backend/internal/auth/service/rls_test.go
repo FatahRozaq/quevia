@@ -12,9 +12,9 @@ import (
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/cache"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func getTestDBAndRedis(t *testing.T) (*AuthService, *pgxpool.Pool) {
@@ -148,7 +148,7 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 
 	// Retrieve internal tenant IDs
 	var tenantIDA, tenantIDB int64
-	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *repository.Queries) error {
+	_ = database.WithTx(ctx, pool, nil, func(tx pgx.Tx, q *sqlc.Queries) error {
 		tA, _ := q.GetTenantBySlug(ctx, slugA)
 		tenantIDA = tA.ID
 		tB, _ := q.GetTenantBySlug(ctx, slugB)
@@ -157,7 +157,7 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 	})
 
 	// Query with Tenant A context:
-	err = database.WithTx(ctx, pool, &tenantIDA, func(tx pgx.Tx, q *repository.Queries) error {
+	err = database.WithTx(ctx, pool, &tenantIDA, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branches, err := q.ListBranchesByTenant(ctx, tenantIDA)
 		if err != nil {
 			return err
@@ -181,7 +181,7 @@ func TestMultiTenantRLSIsolation(t *testing.T) {
 	}
 
 	// Query with Tenant B context:
-	err = database.WithTx(ctx, pool, &tenantIDB, func(tx pgx.Tx, q *repository.Queries) error {
+	err = database.WithTx(ctx, pool, &tenantIDB, func(tx pgx.Tx, q *sqlc.Queries) error {
 		leakBranches, err := q.ListBranchesByTenant(ctx, tenantIDA)
 		if err != nil {
 			return err

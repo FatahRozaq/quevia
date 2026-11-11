@@ -8,17 +8,17 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/security"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/token"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *AuthService) Login(ctx context.Context, input payload.LoginPayload) (*payload.LoginResponse, error) {
 	input.Normalize()
 
 	var result *payload.LoginResponse
-	err := database.WithTx(ctx, s.db, nil, func(tx pgx.Tx, q *repository.Queries) error {
+	err := database.WithTx(ctx, s.db, nil, func(tx pgx.Tx, q *sqlc.Queries) error {
 		user, err := q.GetUserByEmail(ctx, input.Email)
 		if err != nil {
 			return ErrInvalidCredentials

@@ -9,13 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
-func (s *BranchService) ListCounters(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]repository.ListCountersByBranchRow, error) {
-	var rows []repository.ListCountersByBranchRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *BranchService) ListCounters(ctx context.Context, tenantID int64, branchGUID uuid.UUID) ([]sqlc.ListCountersByBranchRow, error) {
+	var rows []sqlc.ListCountersByBranchRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: branchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
@@ -34,15 +34,15 @@ func (s *BranchService) ListCounters(ctx context.Context, tenantID int64, branch
 	return rows, nil
 }
 
-func (s *BranchService) CreateCounter(ctx context.Context, tenantID int64, userID int64, input payload.CreateCounterPayload) (*repository.CreateCounterRow, error) {
-	var row *repository.CreateCounterRow
-	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+func (s *BranchService) CreateCounter(ctx context.Context, tenantID int64, userID int64, input payload.CreateCounterPayload) (*sqlc.CreateCounterRow, error) {
+	var row *sqlc.CreateCounterRow
+	err := database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		branch, err := q.GetBranchByGUID(ctx, pgtype.UUID{Bytes: input.BranchGUID, Valid: true})
 		if err != nil {
 			return ErrBranchNotFound
 		}
 
-		res, err := q.CreateCounter(ctx, repository.CreateCounterParams{
+		res, err := q.CreateCounter(ctx, sqlc.CreateCounterParams{
 			Guid:         pgtype.UUID{Bytes: uuid.New(), Valid: true},
 			TenantID:     tenantID,
 			BranchID:     branch.ID,

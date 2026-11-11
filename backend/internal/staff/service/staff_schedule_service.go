@@ -10,18 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *StaffService) SetStaffSchedules(ctx context.Context, tenantID int64, updaterID int64, staffGUID uuid.UUID, schedules []payload.StaffSchedulePayload) error {
-	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *repository.Queries) error {
+	return database.WithTx(ctx, s.db, &tenantID, func(tx pgx.Tx, q *sqlc.Queries) error {
 		staff, err := q.GetStaffProfileByGUID(ctx, pgtype.UUID{Bytes: staffGUID, Valid: true})
 		if err != nil {
 			return ErrStaffNotFound
 		}
 
-		if err := q.DeleteStaffSchedulesByStaffID(ctx, repository.DeleteStaffSchedulesByStaffIDParams{
+		if err := q.DeleteStaffSchedulesByStaffID(ctx, sqlc.DeleteStaffSchedulesByStaffIDParams{
 			StaffID:   staff.ID,
 			DeletedBy: pgtype.Int8{Int64: updaterID, Valid: true},
 		}); err != nil {
@@ -54,7 +54,7 @@ func (s *StaffService) SetStaffSchedules(ctx context.Context, tenantID int64, up
 				validFromDate = time.Now()
 			}
 
-			_, err = q.CreateStaffSchedule(ctx, repository.CreateStaffScheduleParams{
+			_, err = q.CreateStaffSchedule(ctx, sqlc.CreateStaffScheduleParams{
 				Guid:       pgtype.UUID{Bytes: uuid.New(), Valid: true},
 				TenantID:   tenantID,
 				StaffID:    staff.ID,

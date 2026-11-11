@@ -9,9 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/FatahRozaq/quevia/backend/internal/platform/database"
-	"github.com/FatahRozaq/quevia/backend/internal/platform/database/repository"
 	"github.com/FatahRozaq/quevia/backend/internal/platform/security"
 	"github.com/FatahRozaq/quevia/backend/internal/repository/payload"
+	"github.com/FatahRozaq/quevia/backend/internal/repository/sqlc"
 )
 
 func (s *AuthService) RegisterTenant(ctx context.Context, input payload.RegisterTenantPayload) (*payload.RegisterTenantResponse, error) {
@@ -24,7 +24,7 @@ func (s *AuthService) RegisterTenant(ctx context.Context, input payload.Register
 
 	result := &payload.RegisterTenantResponse{}
 
-	err = database.WithTx(ctx, s.db, nil, func(tx pgx.Tx, q *repository.Queries) error {
+	err = database.WithTx(ctx, s.db, nil, func(tx pgx.Tx, q *sqlc.Queries) error {
 		// 1. Check existing tenant slug
 		if _, err := q.GetTenantBySlug(ctx, input.TenantSlug); err == nil {
 			return ErrTenantSlugExists
@@ -37,7 +37,7 @@ func (s *AuthService) RegisterTenant(ctx context.Context, input payload.Register
 
 		// 3. Create Tenant
 		tenantGUID := uuid.New()
-		tenant, err := q.CreateTenant(ctx, repository.CreateTenantParams{
+		tenant, err := q.CreateTenant(ctx, sqlc.CreateTenantParams{
 			Guid:         pgtype.UUID{Bytes: tenantGUID, Valid: true},
 			Name:         input.TenantName,
 			Slug:         input.TenantSlug,
@@ -51,7 +51,7 @@ func (s *AuthService) RegisterTenant(ctx context.Context, input payload.Register
 
 		// 4. Create User
 		userGUID := uuid.New()
-		user, err := q.CreateUser(ctx, repository.CreateUserParams{
+		user, err := q.CreateUser(ctx, sqlc.CreateUserParams{
 			Guid:         pgtype.UUID{Bytes: userGUID, Valid: true},
 			Email:        input.AdminEmail,
 			PasswordHash: pgtype.Text{String: hashedPassword, Valid: true},
@@ -72,7 +72,7 @@ func (s *AuthService) RegisterTenant(ctx context.Context, input payload.Register
 
 		// 6. Create Default Branch
 		branchGUID := uuid.New()
-		_, err = q.CreateBranch(ctx, repository.CreateBranchParams{
+		_, err = q.CreateBranch(ctx, sqlc.CreateBranchParams{
 			Guid:      pgtype.UUID{Bytes: branchGUID, Valid: true},
 			TenantID:  tenant.ID,
 			Code:      input.BranchCode,
@@ -89,7 +89,7 @@ func (s *AuthService) RegisterTenant(ctx context.Context, input payload.Register
 
 		// 7. Create Membership (TENANT_ADMIN)
 		membershipGUID := uuid.New()
-		_, err = q.CreateMembership(ctx, repository.CreateMembershipParams{
+		_, err = q.CreateMembership(ctx, sqlc.CreateMembershipParams{
 			Guid:      pgtype.UUID{Bytes: membershipGUID, Valid: true},
 			TenantID:  tenant.ID,
 			UserID:    user.ID,
